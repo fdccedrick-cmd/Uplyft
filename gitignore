@@ -1,0 +1,44 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Local config
+local.properties
+
+# Android Studio
+.idea/
+*.iml
+
+# Keystore
+*.jks
+*.keystore
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Generated files
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Firebase (optional: keep or ignore depending on team)
+# If public repo → ignore it
+app/google-services.json
+
+# Kotlin
+*.class
+*.kotlin_module
+
+# Navigation Safe Args
+.navigation/
+
+# Room (schemas if generated)
+schemas/
+
+# Misc
+*.hprof

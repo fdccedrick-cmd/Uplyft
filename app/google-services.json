@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "85910565515",
+    "project_id": "training-46a4d",
+    "storage_bucket": "training-46a4d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:85910565515:android:8f34dc4bc5a830f71e5a8e",
+        "android_client_info": {
+          "package_name": "com.example.uplyft"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAul1gHMGR45HstJCqJLi1_vOsu3T2sLPM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

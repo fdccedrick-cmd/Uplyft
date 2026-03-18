@@ -2,4 +2,16 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="orange">#E97D42</color>
+    <color name="light_background">#F5F3EF</color>
+    <color name="input_background">#E8E5E1</color>
+    <color name="text_gray">#9E9E9E</color>
+    <color name="activity_background">#FAFAFA</color> <!-- Almost white -->
+    <color name="text_color">#212121</color> <!-- Almost black -->
+    <color name="background">#FFFFFF</color> <!-- Light mode background -->
+    <color name="divider_color">#F0F0F0</color> <!-- Light divider -->
+    <color name="divider">#F0F0F0</color> <!-- Light divider -->
+    <color name="secondary_text_color">#757575</color> <!-- Secondary text for light mode -->
+    <color name="on_background">#212121</color> <!-- Text on background - light mode -->
+    <color name="surface">#F5F5F5</color>
 </resources>

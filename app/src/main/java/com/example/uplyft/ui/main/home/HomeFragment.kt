@@ -6,55 +6,152 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import com.example.uplyft.R
+import com.example.uplyft.databinding.FragmentHomeBinding
+import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.cancel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.fragment.app.activityViewModels
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
+import com.example.uplyft.domain.model.Post
+import com.example.uplyft.ui.adapter.PostAdapter
+import com.example.uplyft.viewmodel.FeedState
+import com.example.uplyft.viewmodel.PostViewModel
+import android.content.Intent
+import android.widget.Toast
 
-// TODO: Rename parameter arguments, choose names that match
-// the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
-private const val ARG_PARAM1 = "param1"
-private const val ARG_PARAM2 = "param2"
-
-/**
- * A simple [Fragment] subclass.
- * Use the [HomeFragment.newInstance] factory method to
- * create an instance of this fragment.
- */
 class HomeFragment : Fragment() {
-    // TODO: Rename and change types of parameters
-    private var param1: String? = null
-    private var param2: String? = null
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        arguments?.let {
-            param1 = it.getString(ARG_PARAM1)
-            param2 = it.getString(ARG_PARAM2)
-        }
-    }
+    private var _binding: FragmentHomeBinding? = null
+    private val binding get() = _binding!!
+    private val postViewModel: PostViewModel by activityViewModels()
+    private lateinit var postAdapter: PostAdapter
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
-        // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_home, container, false)
+    ): View {
+        _binding = FragmentHomeBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
-    companion object {
-        /**
-         * Use this factory method to create a new instance of
-         * this fragment using the provided parameters.
-         *
-         * @param param1 Parameter 1.
-         * @param param2 Parameter 2.
-         * @return A new instance of fragment HomeFragment.
-         */
-        // TODO: Rename and change types and number of parameters
-        @JvmStatic
-        fun newInstance(param1: String, param2: String) =
-            HomeFragment().apply {
-                arguments = Bundle().apply {
-                    putString(ARG_PARAM1, param1)
-                    putString(ARG_PARAM2, param2)
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        setupRecyclerView()
+        setupClickListeners()
+        observeFeedState()
+        observePosts()
+    }
+
+    private fun setupRecyclerView() {
+        postAdapter = PostAdapter(
+            onLikeClick    = { post -> postViewModel.toggleLike(post) },
+            onCommentClick = { post ->
+                // navigate to comments
+                // findNavController().navigate(...)
+            },
+            onShareClick   = { post -> sharePost(post) },
+            onProfileClick = { post ->
+                // navigate to user profile
+            }
+        )
+
+        val layoutManager = LinearLayoutManager(requireContext())
+
+        binding.rvFeed.apply {
+            this.layoutManager = layoutManager
+            adapter            = postAdapter
+            // RecycledViewPool — reuses ViewHolders efficiently
+            setRecycledViewPool(RecyclerView.RecycledViewPool())
+            // Smooth image loading — don't stop Glide on fast scroll
+            addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                override fun onScrollStateChanged(rv: RecyclerView, newState: Int) {
+                    when (newState) {
+                        RecyclerView.SCROLL_STATE_IDLE,
+                        RecyclerView.SCROLL_STATE_DRAGGING ->
+                            Glide.with(this@HomeFragment).resumeRequests()
+                        RecyclerView.SCROLL_STATE_SETTLING ->
+                            Glide.with(this@HomeFragment).pauseRequests()
+                    }
+                }
+                // Pagination — load more when near bottom
+                override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
+                    if (dy <= 0) return   // only trigger on downward scroll
+                    val visible    = layoutManager.childCount
+                    val total      = layoutManager.itemCount
+                    val firstVisible = layoutManager.findFirstVisibleItemPosition()
+                    if (visible + firstVisible >= total - 3) {
+                        postViewModel.loadMorePosts()
+                    }
+                }
+            })
+        }
+    }
+
+    private fun setupClickListeners() {
+        binding.ivAddPost.setOnClickListener {
+            findNavController().navigate(R.id.selectImageFragment)
+        }
+    }
+
+    private fun observeFeedState() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                postViewModel.feedState.collect { state ->
+                    if(_binding == null) return@collect
+                    when (state) {
+                        is FeedState.Loading -> {
+                            binding.shimmerLayout.visibility = View.VISIBLE
+                            binding.shimmerLayout.startShimmer()
+                            binding.rvFeed.visibility = View.GONE
+                        }
+                        is FeedState.Success -> {
+                            binding.shimmerLayout.stopShimmer()
+                            binding.shimmerLayout.visibility = View.GONE
+                            binding.rvFeed.visibility = View.VISIBLE
+                        }
+                        is FeedState.Error -> {
+                            binding.shimmerLayout.stopShimmer()
+                            binding.shimmerLayout.visibility = View.GONE
+                            binding.rvFeed.visibility = View.VISIBLE
+                            Toast.makeText(requireContext(), state.message,
+                                Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    private fun observePosts() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                postViewModel.posts.collect { posts ->
+                    postAdapter.submitList(posts)
+                }
+            }
+        }
+    }
+
+    private fun sharePost(post: Post) {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, "Check out this post on Uplyft! ${post.imageUrl}")
+        }
+        startActivity(Intent.createChooser(intent, "Share via"))
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
     }
 }

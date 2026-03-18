@@ -83,4 +83,11 @@ dependencies {
     //lifecycle
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:${lifecycle_version}")
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:${lifecycle_version}")
+
+    //Shimer
+    implementation("com.facebook.shimmer:shimmer:0.5.0")
+
+    // Paging 3
+    implementation("androidx.paging:paging-runtime-ktx:3.3.0")
+    implementation("androidx.paging:paging-common-ktx:3.3.0")
 }

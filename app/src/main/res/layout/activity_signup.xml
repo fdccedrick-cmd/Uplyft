@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="24dp"
-    android:background="@android:color/white"
+    android:background="@color/light_background"
     tools:context=".ui.auth.SignupActivity">
 
     <Space
@@ -14,11 +14,20 @@
         android:layout_height="0dp"
         android:layout_weight="0.25" />
 
+    <!-- App Logo -->
+    <ImageView
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:src="@drawable/app_logo"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="32dp"
+        android:contentDescription="@string/app_name" />
     <!-- Welcome Text -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Create account"
+        android:layout_gravity="center"
         android:textSize="32sp"
         android:textStyle="bold"
         android:textColor="@color/black"
@@ -28,6 +37,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Join the uplift movement."
+        android:layout_gravity="center"
         android:textSize="16sp"
         android:textColor="#757575"
         android:layout_marginTop="8dp"
@@ -97,16 +107,16 @@
         android:layout_marginBottom="32dp" />
 
     <!-- Sign Up Button -->
-    <Button
-        android:id="@+id/btnSignUp"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:text="Sign up"
-        android:textSize="16sp"
-        android:textAllCaps="false"
-        android:backgroundTint="@color/black"
-        app:cornerRadius="8dp"
-        android:layout_marginBottom="24dp" />
+    <com.google.android.material.button.MaterialButton
+    android:id="@+id/btnSignUp"
+    android:layout_width="match_parent"
+    android:layout_height="60dp"
+    android:text="Sign up"
+    android:textSize="18sp"
+    android:textAllCaps="false"
+    android:textColor="@color/white"
+    app:backgroundTint="@color/orange"
+    android:layout_marginBottom="24dp" />
 
     <!-- Login Link -->
     <LinearLayout
@@ -126,7 +136,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Log in"
-            android:textColor="@color/black"
+            android:textColor="@color/orange"
             android:textStyle="bold"
             android:clickable="true"
             android:focusable="true" />

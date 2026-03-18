@@ -6,13 +6,22 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="24dp"
-    android:background="@android:color/white"
+    android:background="@color/light_background"
     tools:context=".ui.auth.LoginActivity">
 
     <Space
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="0.3" />
+
+    <!-- App Logo -->
+    <ImageView
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:src="@drawable/app_logo"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="32dp"
+        android:contentDescription="@string/app_name" />
 
     <!-- Welcome Text -->
     <TextView
@@ -22,71 +31,58 @@
         android:textSize="32sp"
         android:textStyle="bold"
         android:textColor="@color/black"
-        android:fontFamily="sans-serif-medium" />
+        android:fontFamily="sans-serif-medium"
+        android:layout_gravity="center_horizontal" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Your daily momentum."
         android:textSize="16sp"
-        android:textColor="#757575"
+        android:textColor="@color/text_gray"
         android:layout_marginTop="8dp"
-        android:layout_marginBottom="48dp" />
+        android:layout_marginBottom="48dp"
+        android:layout_gravity="center_horizontal" />
 
     <!-- Email Field -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Email"
-        android:textSize="14sp"
-        android:textColor="#757575"
-        android:layout_marginBottom="8dp" />
-
     <EditText
         android:id="@+id/etEmail"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:hint="Enter your email"
+        android:layout_height="60dp"
+        android:hint="Email"
         android:inputType="textEmailAddress"
         android:background="@drawable/bg_input_field"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="12dp"
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="16dp"
         android:textSize="16sp"
-        android:layout_marginBottom="24dp" />
+        android:textColorHint="@color/text_gray"
+        android:layout_marginBottom="16dp" />
 
     <!-- Password Field -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Password"
-        android:textSize="14sp"
-        android:textColor="#757575"
-        android:layout_marginBottom="8dp" />
-
     <EditText
         android:id="@+id/etPassword"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:hint="Enter your password"
+        android:layout_height="60dp"
+        android:hint="Password"
         android:inputType="textPassword"
         android:background="@drawable/bg_input_field"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="12dp"
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="16dp"
         android:textSize="16sp"
-        android:layout_marginBottom="32dp" />
-
-    <!-- Login Button -->
-    <Button
-        android:id="@+id/btnLogin"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:text="Login"
-        android:textSize="16sp"
-        android:textAllCaps="false"
-        android:backgroundTint="@color/black"
-        app:cornerRadius="8dp"
+        android:textColorHint="@color/text_gray"
         android:layout_marginBottom="24dp" />
 
+    <!-- Login Button -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnLogin"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:text="Log in"
+        android:textSize="18sp"
+        android:textAllCaps="false"
+        android:textColor="@color/white"
+        app:backgroundTint="@color/orange"
+        android:layout_marginBottom="24dp" />
     <!-- Sign Up Link -->
     <LinearLayout
         android:layout_width="match_parent"
@@ -98,15 +94,17 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Don't have an account? "
-            android:textColor="#757575" />
+            android:textColor="@color/text_gray"
+            android:textSize="14sp" />
 
         <TextView
             android:id="@+id/tvSignUp"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Sign up"
-            android:textColor="@color/black"
+            android:textColor="@color/orange"
             android:textStyle="bold"
+            android:textSize="14sp"
             android:clickable="true"
             android:focusable="true" />
     </LinearLayout>

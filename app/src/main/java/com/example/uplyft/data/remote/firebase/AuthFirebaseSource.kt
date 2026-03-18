@@ -20,7 +20,23 @@ class AuthFirebaseSource {
     suspend fun signup(email: String, password: String, fullName: String): User {
         val result = auth.createUserWithEmailAndPassword(email, password).await()
         val uid = result.user!!.uid
-        val user = User(uid = uid, fullName = fullName, email = email)
+
+        val username = fullName
+            .trim()
+            .split(" ")
+            .first()
+            .lowercase()
+            .replace(Regex("[^a-z0-9]"), "")
+
+        val user = User(
+            uid             = uid,
+            fullName        = fullName,
+            username        = username,
+            email           = email,
+            profileImageUrl = "",
+            bio             = ""
+        )
+
         db.collection(USERS_COLLECTION).document(uid).set(user).await()
         return user
     }

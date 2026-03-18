@@ -27,6 +27,7 @@ class AuthRepository(
 
     suspend fun signup(email: String, password: String, fullName: String): Resource<User> {
         return try {
+            // username is generated inside firebaseSource.signup()
             val user = firebaseSource.signup(email, password, fullName)
             userDao.insertUser(user.toEntity())
             Resource.Success(user)

@@ -14,6 +14,16 @@ interface UserDao {
     @Query("SELECT * FROM users WHERE uid = :uid LIMIT 1")
     suspend fun getUserById(uid: String): UserEntity?
 
+    @Query("UPDATE users SET profileImageUrl = :url WHERE uid = :uid")
+    suspend fun updateProfileImage(uid: String, url: String)
+
+    @Query("""
+        UPDATE users 
+        SET fullName = :fullName, username = :username, bio = :bio 
+        WHERE uid = :uid
+    """)
+    suspend fun updateProfile(uid: String, fullName: String, username: String, bio: String)
+    
     @Query("DELETE FROM users")
     suspend fun clearUsers()
 }

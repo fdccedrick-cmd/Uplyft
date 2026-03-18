@@ -17,7 +17,12 @@
     <fragment
         android:id="@+id/profileFragment"
         android:name="com.example.uplyft.ui.main.profile.ProfileFragment"
-        android:label="Profile" />
+        android:label="Profile">
+        <action
+            android:id="@+id/action_profileFragment_to_editProfileFragment"
+            app:destination="@id/editProfileFragment"/>
+    </fragment>
+
     <fragment
         android:id="@+id/selectImageFragment"
         android:name="com.example.uplyft.ui.main.createpost.SelectImageFragment">
@@ -33,5 +38,10 @@
             android:name="imageUri"
             app:argType="string"/>
     </fragment>
+
+    <fragment
+        android:id="@+id/editProfileFragment"
+        android:name="com.example.uplyft.ui.main.profile.EditProfileFragment"
+        android:label="Edit Profile"/>
 
 </navigation>

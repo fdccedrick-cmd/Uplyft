@@ -1,6 +1,6 @@
 package com.example.uplyft.ui.main.createpost
 
-import PermissionManager
+import com.example.uplyft.utils.PermissionManager
 import android.os.Bundle
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater

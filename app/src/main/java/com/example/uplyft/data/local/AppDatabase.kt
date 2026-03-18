@@ -11,7 +11,7 @@ import com.example.uplyft.data.local.dao.PostDao
 import com.example.uplyft.data.local.entity.PostEntity
 @Database(
     entities = [PostEntity::class, UserEntity::class],
-    version = 2,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

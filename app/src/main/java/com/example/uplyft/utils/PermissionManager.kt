@@ -1,4 +1,7 @@
 // utils/PermissionManager.kt
+package com.example.uplyft.utils
+
+
 import android.Manifest
 import android.app.AlertDialog
 import android.content.Intent

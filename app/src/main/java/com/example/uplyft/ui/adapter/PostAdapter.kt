@@ -98,6 +98,7 @@ class PostAdapter(
             Glide.with(binding.root)
                 .load(post.imageUrl)
                 .placeholder(R.color.surface)
+                .centerCrop()
                 .diskCacheStrategy(DiskCacheStrategy.ALL)   // cache full + thumbnail
                 .into(binding.ivPostImage)
 

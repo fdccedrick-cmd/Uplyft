@@ -284,5 +284,82 @@ class CommentViewModel(application: Application) : AndroidViewModel(application)
                     ?.copy(uid = uid)
         }
     }
+
+    /* ================= DEBUG/TESTING ================= */
+
+    /**
+     * Sync post comment count from Firestore to Room
+     * Call this after manually deleting comments in Firestore Console
+     */
+    fun syncPostCommentCountFromFirestore(postId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val firestoreDb = FirebaseFirestore.getInstance()
+
+                // Get actual comment count from Firestore
+                val actualCommentCount = firestoreDb.collection(POSTS_COLLECTION)
+                    .document(postId)
+                    .collection("comments")
+                    .get()
+                    .await()
+                    .size()
+
+                // Update Room database
+                db.postDao().updateCommentCount(postId, actualCommentCount)
+
+                // Also update the Firestore post document
+                firestoreDb.collection(POSTS_COLLECTION)
+                    .document(postId)
+                    .update("commentsCount", actualCommentCount)
+                    .await()
+
+                println("✅ Updated post $postId: commentsCount = $actualCommentCount")
+
+            } catch (e: Exception) {
+                println("❌ Error syncing comment count: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Fix ALL posts comment counts from Firestore
+     */
+    fun syncAllPostCommentCounts() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val firestoreDb = FirebaseFirestore.getInstance()
+
+                // Get all posts
+                val posts = firestoreDb.collection(POSTS_COLLECTION).get().await()
+
+                var fixed = 0
+
+                for (postDoc in posts.documents) {
+                    val postId = postDoc.id
+
+                    // Get actual comment count
+                    val actualCount = firestoreDb.collection(POSTS_COLLECTION)
+                        .document(postId)
+                        .collection("comments")
+                        .get()
+                        .await()
+                        .size()
+
+                    // Update Room
+                    db.postDao().updateCommentCount(postId, actualCount)
+
+                    // Update Firestore post document
+                    postDoc.reference.update("commentsCount", actualCount).await()
+
+                    fixed++
+                }
+
+                println("✅ Fixed $fixed posts' comment counts")
+
+            } catch (e: Exception) {
+                println("❌ Error: ${e.message}")
+            }
+        }
+    }
 }
 

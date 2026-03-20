@@ -14,7 +14,7 @@ import com.example.uplyft.data.local.entity.FollowEntity
 
 @Database(
     entities = [PostEntity::class, UserEntity::class, FollowEntity::class],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

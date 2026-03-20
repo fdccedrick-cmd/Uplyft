@@ -110,6 +110,8 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
             // Load comments for this post
             postId?.let {
                 viewModel.loadComments(it)
+                // DEBUG: Sync comment count from Firestore (remove after testing)
+                viewModel.syncPostCommentCountFromFirestore(it)
             }
         }
     }

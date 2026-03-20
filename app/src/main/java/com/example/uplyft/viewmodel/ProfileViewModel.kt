@@ -114,7 +114,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                     else followSource.isFollowing(uid, currentUid)
                 }
                 val posts = withContext(Dispatchers.IO) {
-                    PostFirebaseSource().fetchUserPosts(uid)
+                    PostFirebaseSource().fetchUserPosts(uid, currentUserId = currentUid)
                 }
 
                 // Update Room cache

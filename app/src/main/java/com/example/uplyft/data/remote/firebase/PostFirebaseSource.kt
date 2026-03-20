@@ -25,7 +25,7 @@ class PostFirebaseSource {
     }
 
     // ✅ Fix — limit param added, saves lastVisible for pagination
-    suspend fun fetchPosts(limit: Int = 10): List<Post> {
+    suspend fun fetchPosts(limit: Int = 10, currentUserId: String?): List<Post> {
         val snapshot = db.collection(POSTS_COLLECTION)
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .limit(limit.toLong())
@@ -47,16 +47,28 @@ class PostFirebaseSource {
             val username = userDoc.getString("username") ?: ""
             val profileImageUrl = userDoc.getString("profileImageUrl") ?: ""
 
+            // Check if current user liked this post
+            val isLiked = if (currentUserId != null) {
+                db.collection(POSTS_COLLECTION)
+                    .document(doc.id)
+                    .collection("likes")
+                    .document(currentUserId)
+                    .get()
+                    .await()
+                    .exists()
+            } else false
+
             post.copy(
                 // fallback to fullName if username is empty
                 username     = username.ifEmpty { fullName },
-                userImageUrl = profileImageUrl
+                userImageUrl = profileImageUrl,
+                isLiked      = isLiked
             )
         }
     }
 
     // ✅ Fix — fetchMorePosts uses lastVisible cursor
-    suspend fun fetchMorePosts(limit: Int = 10): List<Post> {
+    suspend fun fetchMorePosts(limit: Int = 10, currentUserId: String?): List<Post> {
         val last = lastVisible ?: return emptyList()   // nothing to paginate
 
         val snapshot = db.collection(POSTS_COLLECTION)
@@ -69,20 +81,47 @@ class PostFirebaseSource {
         lastVisible = snapshot.documents.lastOrNull()
 
         return snapshot.documents.mapNotNull { doc ->
-            doc.toObject(Post::class.java)?.copy(postId = doc.id)
+            val post = doc.toObject(Post::class.java)?.copy(postId = doc.id) ?: return@mapNotNull null
+
+            // Check if current user liked this post
+            val isLiked = if (currentUserId != null) {
+                db.collection(POSTS_COLLECTION)
+                    .document(doc.id)
+                    .collection("likes")
+                    .document(currentUserId)
+                    .get()
+                    .await()
+                    .exists()
+            } else false
+
+            post.copy(isLiked = isLiked)
         }
     }
 
-    suspend fun fetchUserPosts(userId: String): List<Post> {
-        return db.collection(POSTS_COLLECTION)
+    suspend fun fetchUserPosts(userId: String, currentUserId: String?): List<Post> {
+        val posts = db.collection(POSTS_COLLECTION)
             .whereEqualTo("userId", userId)
             .get()
             .await()
             .documents
             .mapNotNull { doc ->
-                doc.toObject(Post::class.java)?.copy(postId = doc.id)
+                val post = doc.toObject(Post::class.java)?.copy(postId = doc.id) ?: return@mapNotNull null
+
+                // Check if current user liked this post
+                val isLiked = if (currentUserId != null) {
+                    db.collection(POSTS_COLLECTION)
+                        .document(doc.id)
+                        .collection("likes")
+                        .document(currentUserId)
+                        .get()
+                        .await()
+                        .exists()
+                } else false
+
+                post.copy(isLiked = isLiked)
             }
-            .sortedByDescending { it.createdAt }   // ← sort after fetch
+
+        return posts.sortedByDescending { it.createdAt }   // ← sort after fetch
     }
     suspend fun toggleLike(postId: String, userId: String): Boolean {
         val likeRef = db.collection(POSTS_COLLECTION)

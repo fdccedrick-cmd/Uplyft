@@ -1,6 +1,7 @@
 package com.example.uplyft.ui.adapter
 
 import android.app.AlertDialog
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.text.*
 import android.text.method.LinkMovementMethod
@@ -34,6 +35,14 @@ class CommentAdapter(
 
             override fun areContentsTheSame(a: Comment, b: Comment) =
                 a == b
+
+            // Return payload when only like state changed
+            override fun getChangePayload(oldItem: Comment, newItem: Comment): Any? {
+                return if (oldItem.isLiked != newItem.isLiked ||
+                          oldItem.likesCount != newItem.likesCount) {
+                    "like_update"
+                } else null
+            }
         }
     }
 
@@ -52,6 +61,14 @@ class CommentAdapter(
     }
 
     override fun onBindViewHolder(h: VH, pos: Int) = h.bind(getItem(pos))
+
+    override fun onBindViewHolder(holder: VH, position: Int, payloads: MutableList<Any>) {
+        if (payloads.contains("like_update")) {
+            holder.bindLike(getItem(position))
+        } else {
+            super.onBindViewHolder(holder, position, payloads)
+        }
+    }
 
     private fun getRelativeTime(timestamp: Long): String {
         val now  = System.currentTimeMillis()
@@ -77,6 +94,11 @@ class CommentAdapter(
 
             b.root.alpha = if (c.isPending) 0.5f else 1f
 
+            // ✅ CRITICAL: Clear reply views to prevent recycling issues
+            b.layoutReplies.removeAllViews()
+            b.layoutReplies.visibility = View.GONE
+            b.layoutViewReplies.visibility = View.GONE
+
             // ✅ clear previous image BEFORE loading new one
             // prevents wrong avatar showing during fast scroll
             Glide.with(b.root)
@@ -99,9 +121,17 @@ class CommentAdapter(
             b.tvTime.visibility = View.VISIBLE
 
             bindText(c)
+            bindLike(c)
 
             b.tvReply.setOnClickListener { onReply(c) }
-            b.ivLikeComment.setOnClickListener { onLike(c) }
+            b.ivLikeComment.setOnClickListener {
+                animateLike(b.ivLikeComment, !c.isLiked)
+                onLike(c)
+            }
+
+            // ✅ make avatar and username clickable
+            b.ivUserAvatar.setOnClickListener { onAvatar(c) }
+            b.tvUsername.setOnClickListener { onAvatar(c) }
 
             // ✅ long press delete
             if (c.userId == currentUid && !c.isPending) {
@@ -118,6 +148,43 @@ class CommentAdapter(
             }
 
             setupReplies(c)
+        }
+
+        fun bindLike(c: Comment) {
+            // Set heart icon based on like state
+            b.ivLikeComment.setImageResource(
+                if (c.isLiked) R.drawable.ic_heart_filled
+                else R.drawable.ic_heart_outline
+            )
+
+            // Set heart color
+            b.ivLikeComment.imageTintList = if (c.isLiked)
+                ColorStateList.valueOf(Color.RED)
+            else
+                ColorStateList.valueOf(Color.parseColor("#999999"))
+
+            // Show like count only if > 0
+            if (c.likesCount > 0) {
+                b.tvCommentLikeCount.text = c.likesCount.toString()
+                b.tvCommentLikeCount.visibility = View.VISIBLE
+            } else {
+                b.tvCommentLikeCount.visibility = View.GONE
+            }
+        }
+
+        private fun animateLike(view: View, liked: Boolean) {
+            if (liked) {
+                // Instagram-style bounce animation
+                view.animate()
+                    .scaleX(1.3f).scaleY(1.3f)
+                    .setDuration(150)
+                    .withEndAction {
+                        view.animate()
+                            .scaleX(1f).scaleY(1f)
+                            .setDuration(150)
+                            .start()
+                    }.start()
+            }
         }
 
         private fun bindText(c: Comment) {
@@ -170,6 +237,7 @@ class CommentAdapter(
 
             if (replies.isEmpty()) {
                 b.layoutViewReplies.visibility = View.GONE
+                b.layoutReplies.visibility = View.GONE
                 return
             }
 
@@ -184,40 +252,88 @@ class CommentAdapter(
                 if (isExpanded) View.VISIBLE else View.GONE
 
             b.layoutViewReplies.setOnClickListener {
-                if (isExpanded) expanded.remove(c.commentId)
-                else expanded.add(c.commentId)
+                val position = bindingAdapterPosition
+                if (position == RecyclerView.NO_POSITION) return@setOnClickListener
 
-                notifyItemChanged(bindingAdapterPosition)
+                if (isExpanded) {
+                    expanded.remove(c.commentId)
+                    // Clear views when collapsing
+                    b.layoutReplies.removeAllViews()
+                } else {
+                    expanded.add(c.commentId)
+                }
+
+                // Just toggle visibility without notifying
+                val nowExpanded = expanded.contains(c.commentId)
+                b.tvViewReplies.text = if (nowExpanded) "Hide replies" else "View replies (${replies.size})"
+                b.layoutReplies.visibility = if (nowExpanded) View.VISIBLE else View.GONE
+
+                // Build views when expanding
+                if (nowExpanded) {
+                    b.layoutReplies.removeAllViews()  // Clear first
+                    buildReplyViews(replies)
+                }
             }
 
+            // ALWAYS rebuild reply views if expanded to show latest like states
             if (isExpanded) {
                 b.layoutReplies.removeAllViews()
+                buildReplyViews(replies)
+            }
+        }
 
-                replies.forEach { r ->
-                    val item = ItemCommentBinding.inflate(
-                        LayoutInflater.from(b.root.context),
-                        b.layoutReplies,
-                        false
-                    )
+        private fun buildReplyViews(replies: List<Comment>) {
+            replies.forEach { r ->
+                val item = ItemCommentBinding.inflate(
+                    LayoutInflater.from(b.root.context),
+                    b.layoutReplies,
+                    false
+                )
 
-                    // ✅ clear + load avatar for each reply
-                    Glide.with(item.root)
-                        .clear(item.ivUserAvatar)
+                // ✅ clear + load avatar for each reply
+                Glide.with(item.root)
+                    .clear(item.ivUserAvatar)
 
-                    Glide.with(item.root)
-                        .load(r.userImage.ifEmpty { null })
-                        .placeholder(R.drawable.app_logo)
-                        .error(R.drawable.app_logo)
-                        .circleCrop()
-                        .diskCacheStrategy(DiskCacheStrategy.ALL)
-                        .into(item.ivUserAvatar)
+                Glide.with(item.root)
+                    .load(r.userImage.ifEmpty { null })
+                    .placeholder(R.drawable.app_logo)
+                    .error(R.drawable.app_logo)
+                    .circleCrop()
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .into(item.ivUserAvatar)
 
-                    item.tvUsername.text = r.username.ifEmpty { "user" }
-                    item.tvTime.text     = getRelativeTime(r.createdAt)
-                    item.tvCommentText.text = r.text
+                item.tvUsername.text = r.username.ifEmpty { "user" }
+                item.tvTime.text     = getRelativeTime(r.createdAt)
+                item.tvCommentText.text = r.text
 
-                    b.layoutReplies.addView(item.root)
+                // Bind like state for reply
+                item.ivLikeComment.setImageResource(
+                    if (r.isLiked) R.drawable.ic_heart_filled
+                    else R.drawable.ic_heart_outline
+                )
+                item.ivLikeComment.imageTintList = if (r.isLiked)
+                    ColorStateList.valueOf(Color.RED)
+                else
+                    ColorStateList.valueOf(Color.parseColor("#999999"))
+
+                if (r.likesCount > 0) {
+                    item.tvCommentLikeCount.text = r.likesCount.toString()
+                    item.tvCommentLikeCount.visibility = View.VISIBLE
+                } else {
+                    item.tvCommentLikeCount.visibility = View.GONE
                 }
+
+                // Add like click listener with animation
+                item.ivLikeComment.setOnClickListener {
+                    animateLike(item.ivLikeComment, !r.isLiked)
+                    onLike(r)
+                }
+
+                // ✅ make reply avatar and username clickable
+                item.ivUserAvatar.setOnClickListener { onAvatar(r) }
+                item.tvUsername.setOnClickListener { onAvatar(r) }
+
+                b.layoutReplies.addView(item.root)
             }
         }
 

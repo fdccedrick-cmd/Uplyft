@@ -53,7 +53,7 @@ class UserProfileViewModel(application: Application) : AndroidViewModel(applicat
                 else followSource.isFollowing(currentUid, targetUserId)
 
                 // Fetch user posts from Firestore
-                val posts = firebaseSource.fetchUserPosts(targetUserId)
+                val posts = firebaseSource.fetchUserPosts(targetUserId, currentUserId = currentUid)
 
                 _profileState.value = Resource.Success(
                     UserProfileState(

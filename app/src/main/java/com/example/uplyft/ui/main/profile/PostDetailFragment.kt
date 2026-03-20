@@ -52,6 +52,7 @@ class PostDetailFragment : Fragment() {
         clickedPostId = arguments?.getString("postId")
         ownerUserId   = arguments?.getString("userId")
 
+
         setupRecyclerView()
         setupClickListeners()
         loadPosts()
@@ -62,7 +63,7 @@ class PostDetailFragment : Fragment() {
             onLikeClick    = { post -> postViewModel.toggleLike(post) },
             onCommentClick = { post ->
                 CommentsBottomSheet.newInstance(post.postId)
-                    .show(parentFragmentManager, CommentsBottomSheet.TAG)
+                    .show(childFragmentManager, CommentsBottomSheet.TAG)
             },
             onShareClick   = { post -> sharePost(post) },
             onProfileClick = { post ->

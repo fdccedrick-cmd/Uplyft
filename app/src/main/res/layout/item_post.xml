@@ -57,55 +57,122 @@
 
     </LinearLayout>
 
-    <!-- ✅ Square post image — Instagram style -->
-    <ImageView
-        android:id="@+id/ivPostImage"
+    <!-- ✅ Square post image with heart overlay — Instagram style -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/imageContainer"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:scaleType="centerCrop"
-        android:background="@color/surface"
         app:layout_constraintDimensionRatio="1:1"
         app:layout_constraintTop_toBottomOf="@id/layoutPostHeader"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
+        app:layout_constraintEnd_toEndOf="parent">
 
-    <!-- Action Buttons -->
+        <ImageView
+            android:id="@+id/ivPostImage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:background="@color/surface"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"/>
+
+        <!-- Heart overlay for double-tap animation (Instagram style) -->
+        <ImageView
+            android:id="@+id/ivHeartOverlay"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:src="@drawable/ic_heart_filled"
+            android:tint="#FFFFFF"
+            android:alpha="0"
+            android:visibility="gone"
+            android:elevation="4dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:contentDescription="Like animation"/>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- Action Buttons with Counts -->
     <LinearLayout
         android:id="@+id/layoutActions"
         android:layout_width="0dp"
         android:layout_height="48dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingHorizontal="4dp"
-        app:layout_constraintTop_toBottomOf="@id/ivPostImage"
+        android:paddingHorizontal="8dp"
+        app:layout_constraintTop_toBottomOf="@id/imageContainer"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <ImageView
-            android:id="@+id/ivLike"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@drawable/ic_heart_outline"
-            app:tint="@color/on_background"
-            android:padding="8dp"
-            android:contentDescription="Like"/>
+        <!-- Like Button with Count -->
+        <LinearLayout
+            android:id="@+id/layoutLike"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingEnd="12dp">
 
-        <ImageView
-            android:id="@+id/ivComment"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@drawable/ic_comment"
-            app:tint="@color/on_background"
-            android:padding="8dp"
-            android:contentDescription="Comment"/>
+            <ImageView
+                android:id="@+id/ivLike"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_heart_outline"
+                app:tint="@color/on_background"
+                android:contentDescription="Like"/>
 
+            <TextView
+                android:id="@+id/tvLikesCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="@color/on_background"
+                android:visibility="gone"/>
+
+        </LinearLayout>
+
+        <!-- Comment Button with Count -->
+        <LinearLayout
+            android:id="@+id/layoutComment"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingEnd="12dp">
+
+            <ImageView
+                android:id="@+id/ivComment"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_comment"
+                app:tint="@color/on_background"
+                android:contentDescription="Comment"/>
+
+            <TextView
+                android:id="@+id/tvCommentsCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="@color/on_background"
+                android:visibility="gone"/>
+
+        </LinearLayout>
+
+        <!-- Share Button -->
         <ImageView
             android:id="@+id/ivShare"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
             android:src="@drawable/ic_share"
             app:tint="@color/on_background"
-            android:padding="8dp"
             android:contentDescription="Share"/>
 
         <View
@@ -115,30 +182,7 @@
 
     </LinearLayout>
 
-    <!-- Likes count -->
-    <TextView
-        android:id="@+id/tvLikesCount"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="0 likes"
-        android:textSize="13sp"
-        android:textStyle="bold"
-        android:textColor="@color/on_background"
-        android:paddingHorizontal="12dp"
-        app:layout_constraintTop_toBottomOf="@id/layoutActions"
-        app:layout_constraintStart_toStartOf="parent"/>
 
-    <TextView
-        android:id="@+id/tvCommentsCount"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="View all 0 comments"
-        android:textSize="13sp"
-        android:textColor="#AAAAAA"
-        android:paddingHorizontal="12dp"
-        android:paddingTop="2dp"
-        app:layout_constraintTop_toBottomOf="@id/tvLikesCount"
-        app:layout_constraintStart_toStartOf="parent"/>
     <!-- Caption -->
     <TextView
         android:id="@+id/tvCaption"
@@ -149,7 +193,7 @@
         android:paddingBottom="4dp"
         android:textSize="13sp"
         android:textColor="@color/on_background"
-        app:layout_constraintTop_toBottomOf="@id/tvLikesCount"
+        app:layout_constraintTop_toBottomOf="@id/layoutActions"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>
 

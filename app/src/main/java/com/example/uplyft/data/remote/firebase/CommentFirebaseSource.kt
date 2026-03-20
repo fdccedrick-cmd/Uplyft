@@ -4,12 +4,16 @@ import com.example.uplyft.domain.model.Comment
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.ktx.toObject
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import com.example.uplyft.utils.Constants.POSTS_COLLECTION
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 
 // data/remote/firebase/CommentFirebaseSource.kt
 class CommentFirebaseSource {
@@ -62,7 +66,9 @@ class CommentFirebaseSource {
     }
 
     // ✅ real-time listener — updates instantly when anyone comments
-    fun observeComments(postId: String): Flow<List<Comment>> = callbackFlow {
+    fun observeComments(postId: String, currentUserId: String?): Flow<List<Comment>> = callbackFlow {
+        var initialLoadComplete = false
+
         val listener = db.collection(POSTS_COLLECTION)
             .document(postId)
             .collection("comments")
@@ -72,13 +78,49 @@ class CommentFirebaseSource {
                     close(error)
                     return@addSnapshotListener
                 }
+
                 val comments = snapshot?.documents
                     ?.mapNotNull { doc ->
                         doc.toObject(Comment::class.java)?.copy(commentId = doc.id)
                     } ?: emptyList()
-                trySend(comments)
+
+                // Only check like status on INITIAL load
+                if (!initialLoadComplete && currentUserId != null && comments.isNotEmpty()) {
+                    initialLoadComplete = true
+
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            // Check all likes in parallel ONCE
+                            val commentsWithLikes = comments.map { comment ->
+                                async {
+                                    val isLiked = try {
+                                        db.collection(POSTS_COLLECTION)
+                                            .document(postId)
+                                            .collection("comments")
+                                            .document(comment.commentId)
+                                            .collection("likes")
+                                            .document(currentUserId)
+                                            .get()
+                                            .await()
+                                            .exists()
+                                    } catch (_: Exception) {
+                                        false
+                                    }
+                                    comment.copy(isLiked = isLiked)
+                                }
+                            }.awaitAll()
+
+                            trySend(commentsWithLikes)
+                        } catch (_: Exception) {
+                            trySend(comments)
+                        }
+                    }
+                } else {
+                    // Subsequent updates - just send comment data without checking likes
+                    // ViewModel will preserve like states
+                    trySend(comments)
+                }
             }
-        // ✅ remove listener when flow is cancelled
         awaitClose { listener.remove() }
     }
 }

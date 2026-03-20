@@ -1,6 +1,7 @@
 package com.example.uplyft.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.uplyft.data.local.AppDatabase
@@ -27,18 +28,16 @@ class MentionViewModel(application: Application) : AndroidViewModel(application)
     val suggestions: StateFlow<List<MentionUser>> = _suggestions
 
     fun searchMentions(query: String, currentUid: String) {
-        if (query.isEmpty()) {
-            _suggestions.value = emptyList()
-            return
-        }
-
+        Log.d("MentionViewModel", "searchMentions called with query='$query', currentUid=$currentUid")
         viewModelScope.launch {
             try {
                 val results = withContext(Dispatchers.IO) {
                     fetchMentionSuggestions(query, currentUid)
                 }
+                Log.d("MentionViewModel", "Found ${results.size} mention suggestions")
                 _suggestions.value = results
             } catch (e: Exception) {
+                Log.e("MentionViewModel", "Error searching mentions", e)
                 _suggestions.value = emptyList()
             }
         }
@@ -49,6 +48,7 @@ class MentionViewModel(application: Application) : AndroidViewModel(application)
         currentUid: String
     ): List<MentionUser> {
 
+        Log.d("MentionViewModel", "Fetching following for user $currentUid")
         val followingSnap = firestore.collection(FOLLOWS_COLLECTION)
             .whereEqualTo("followerId", currentUid)
             .get().await()
@@ -56,8 +56,13 @@ class MentionViewModel(application: Application) : AndroidViewModel(application)
             .mapNotNull { it.getString("followingId") }
             .filter { it.isNotEmpty() }
 
+        Log.d("MentionViewModel", "User follows ${followingIds.size} users")
+
         // ✅ return empty if nobody followed — whereIn crashes on empty list
-        if (followingIds.isEmpty()) return emptyList()
+        if (followingIds.isEmpty()) {
+            Log.d("MentionViewModel", "No following users found, returning empty list")
+            return emptyList()
+        }
 
         val followersSnap = firestore.collection(FOLLOWS_COLLECTION)
             .whereEqualTo("followingId", currentUid)

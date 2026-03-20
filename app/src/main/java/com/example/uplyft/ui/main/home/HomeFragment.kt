@@ -50,16 +50,7 @@ class HomeFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        parentFragmentManager.setFragmentResultListener(
-            "navigate_to_profile",
-            viewLifecycleOwner
-        ) { _, bundle ->
-            val userId = bundle.getString("userId") ?: return@setFragmentResultListener
-            val b = Bundle().apply { putString("userId", userId) }
-            findNavController().navigate(
-                R.id.action_homeFragment_to_userProfileFragment, b
-            )
-        }
+
         setupRecyclerView()
         setupClickListeners()
         observeFeedState()
@@ -81,7 +72,7 @@ class HomeFragment : Fragment() {
             onLikeClick    = { post -> postViewModel.toggleLike(post) },
             onCommentClick = { post ->
                 CommentsBottomSheet.newInstance(post.postId)
-                    .show(parentFragmentManager, CommentsBottomSheet.TAG)
+                    .show(childFragmentManager, CommentsBottomSheet.TAG)
             },
             onShareClick   = { post -> sharePost(post) },
             onProfileClick = { post ->

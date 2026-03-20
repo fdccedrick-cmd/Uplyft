@@ -16,6 +16,9 @@ import com.example.uplyft.utils.PostUploadState
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 
 // data/repository/PostRepository.kt
@@ -25,35 +28,87 @@ class PostRepository(
     private val cloudinaryService: CloudinaryService
 ) {
 
+    // Track posts with pending optimistic updates to prevent Firestore from overwriting them
+    private val pendingLikeUpdates = mutableSetOf<String>()
+
     suspend fun refreshPosts(limit: Int = 10) {
         try {
-            val remotePosts = firebaseSource.fetchPosts(limit = limit)
+            val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+            val remotePosts = firebaseSource.fetchPosts(limit = limit, currentUserId = currentUserId)
             remotePosts.forEach { post ->
-                postDao.insertPost(post.toEntity(isSynced = true))
+                // Don't overwrite posts with pending optimistic updates
+                if (!pendingLikeUpdates.contains(post.postId)) {
+                    postDao.insertPost(post.toEntity(isSynced = true))
+                }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Silently fail — Room cache shows last known posts
         }
     }
+
     suspend fun loadMorePosts(limit: Int = 10) {
         try {
-            val remotePosts = firebaseSource.fetchMorePosts(limit = limit)
+            val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+            val remotePosts = firebaseSource.fetchMorePosts(limit = limit, currentUserId = currentUserId)
             remotePosts.forEach { post ->
-                postDao.insertPost(post.toEntity(isSynced = true))
+                // Don't overwrite posts with pending optimistic updates
+                if (!pendingLikeUpdates.contains(post.postId)) {
+                    postDao.insertPost(post.toEntity(isSynced = true))
+                }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Silently fail
         }
     }
+
     suspend fun toggleLike(post: Post) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        try {
-            val isLiked = firebaseSource.toggleLike(post.postId, userId)
-            val newCount = if (isLiked) post.likesCount + 1 else post.likesCount - 1
-            // Update Room instantly
-            postDao.updateLikeCount(post.postId, newCount)
-        } catch (e: Exception) {
-            // Revert silently if it fails
+
+        // 1. INSTANT UI UPDATE (Instagram approach)
+        val newIsLiked = !post.isLiked
+        val newCount = if (newIsLiked) post.likesCount + 1 else post.likesCount - 1
+
+        // Update Room cache immediately - UI reflects this instantly
+        postDao.updateLikeState(post.postId, newIsLiked, newCount)
+
+        // 2. BACKGROUND SYNC to Firebase (launch and forget - don't wait)
+        CoroutineScope(Dispatchers.IO).launch {
+            // Mark as pending just before sync
+            pendingLikeUpdates.add(post.postId)
+
+            try {
+                // Use newIsLiked state directly instead of checking exists
+                val likeRef = FirebaseFirestore.getInstance()
+                    .collection("posts")
+                    .document(post.postId)
+                    .collection("likes")
+                    .document(userId)
+
+                val postRef = FirebaseFirestore.getInstance()
+                    .collection("posts")
+                    .document(post.postId)
+
+                if (newIsLiked) {
+                    // Liking - add like
+                    likeRef.set(mapOf("likedAt" to System.currentTimeMillis())).await()
+                    postRef.update("likesCount", com.google.firebase.firestore.FieldValue.increment(1)).await()
+                } else {
+                    // Unliking - remove like
+                    likeRef.delete().await()
+                    postRef.update("likesCount", com.google.firebase.firestore.FieldValue.increment(-1)).await()
+                }
+
+                // Remove from pending immediately after sync
+                pendingLikeUpdates.remove(post.postId)
+
+                // Wait for Firestore to propagate
+                kotlinx.coroutines.delay(500)
+
+            } catch (_: Exception) {
+                // If Firebase fails, revert the optimistic update
+                postDao.updateLikeState(post.postId, post.isLiked, post.likesCount)
+                pendingLikeUpdates.remove(post.postId)
+            }
         }
     }
 

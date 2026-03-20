@@ -6,6 +6,7 @@ import android.content.DialogInterface
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.Log
 import android.view.*
 import android.view.inputmethod.InputMethodManager
 import android.widget.*
@@ -35,6 +36,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.RecyclerView
 import com.example.uplyft.ui.adapter.MentionAdapter
 import com.example.uplyft.viewmodel.MentionViewModel
+import androidx.navigation.fragment.findNavController
 
 
 class CommentsBottomSheet : BottomSheetDialogFragment() {
@@ -105,7 +107,10 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
             setupRecycler()
             observeData()
             loadUser()
-            postId?.let { viewModel.loadComments(it) }
+            // Load comments for this post
+            postId?.let {
+                viewModel.loadComments(it)
+            }
         }
     }
 
@@ -326,12 +331,16 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
                 val sub    = text.substring(0, cursor)
                 val atIdx  = sub.lastIndexOf('@')
 
+                Log.d("CommentsBottomSheet", "onTextChanged: text='$text', cursor=$cursor, atIdx=$atIdx")
+
                 if (atIdx >= 0) {
                     val afterAt = sub.substring(atIdx + 1)
+                    Log.d("CommentsBottomSheet", "Found @ at index $atIdx, afterAt='$afterAt'")
                     // ✅ only trigger if no space after @ (still typing username)
                     if (!afterAt.contains(' ')) {
                         isMentioning        = true
                         currentMentionQuery = afterAt
+                        Log.d("CommentsBottomSheet", "Triggering mention search with query='$afterAt'")
                         currentUid?.let {
                             mentionViewModel.searchMentions(afterAt, it)
                         }
@@ -340,6 +349,7 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
                 }
 
                 // hide suggestions
+                Log.d("CommentsBottomSheet", "Hiding mention suggestions")
                 isMentioning = false
                 mentionViewModel.clearSuggestions()
             }
@@ -390,7 +400,15 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
                 focusKeyboard()
             },
             onLike          = { viewModel.toggleCommentLike(it) },
-            onAvatar        = { dismiss() },
+            onAvatar        = { comment ->
+                // ✅ if own comment, navigate to ProfileFragment
+                // ✅ if other user, navigate to their UserProfileFragment
+                if (comment.userId == currentUid) {
+                    navigateToOwnProfile()
+                } else {
+                    navigateToUserProfile(comment.userId)
+                }
+            },
             onUsername      = { navigateToProfile(it) }
         )
 
@@ -400,6 +418,8 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
             isNestedScrollingEnabled = true
             overScrollMode           = View.OVER_SCROLL_NEVER
             clipToPadding            = false
+            // Prevent jumping during item changes
+            itemAnimator             = null
         }
     }
 
@@ -407,23 +427,30 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
     // OBSERVE
     // ─────────────────────────────────────────────
 
+    private var lastCommentCount = 0
+
     private fun observeData() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
 
                 launch {
                     viewModel.comments.collect { list ->
-                        adapter.submitFullList(list)
                         val topLevel = list.filter { it.parentId.isEmpty() }
+                        val currentCount = topLevel.size
+
+                        adapter.submitFullList(list)
                         emptyState.visibility   = if (topLevel.isEmpty()) View.VISIBLE else View.GONE
                         recyclerView.visibility = View.VISIBLE
-                        if (topLevel.isNotEmpty()) {
+
+                        // Only auto-scroll if a new top-level comment was added
+                        if (currentCount > lastCommentCount && topLevel.isNotEmpty()) {
                             recyclerView.post {
-                                recyclerView.post {
-                                    recyclerView.scrollToPosition(adapter.itemCount - 1)
+                                if (adapter.itemCount > 0) {
+                                    recyclerView.smoothScrollToPosition(adapter.itemCount - 1)
                                 }
                             }
                         }
+                        lastCommentCount = currentCount
                     }
                 }
 
@@ -442,6 +469,8 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
                         if (!isAdded) return@collect
                         if (!::mentionAdapter.isInitialized) return@collect
 
+                        Log.d("CommentsBottomSheet", "Received ${list.size} mention suggestions, isMentioning=$isMentioning")
+
                         val rvMentions     = inputBar.findViewById<RecyclerView>(
                             R.id.rvMentionSuggestions)
                         val mentionDivider = inputBar.findViewById<View>(
@@ -449,6 +478,9 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
 
                         mentionAdapter.submitList(list)
                         val show = list.isNotEmpty() && isMentioning
+
+                        Log.d("CommentsBottomSheet", "Show mention suggestions: $show (list.size=${list.size}, isMentioning=$isMentioning)")
+
                         rvMentions.visibility     = if (show) View.VISIBLE else View.GONE
                         mentionDivider.visibility = if (show) View.VISIBLE else View.GONE
 
@@ -513,14 +545,53 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
                 db.userDao().getUserByUsername(username)?.uid
             }
             userId?.let { uid ->
-                dismiss()
-                parentFragmentManager.setFragmentResult(
-                    "navigate_to_profile",
-                    Bundle().apply { putString("userId", uid) }
-                )
+                navigateToUserProfile(uid)
             }
         }
     }
+
+    private fun navigateToOwnProfile() {
+        // Navigate to ProfileFragment (own profile) via bottom nav
+        try {
+            requireActivity()
+                .findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(R.id.bottomNavigationView)
+                ?.selectedItemId = R.id.profileFragment
+        } catch (e: Exception) {
+            // Fallback if bottom nav not available
+        }
+    }
+
+    private fun navigateToUserProfile(userId: String) {
+        // Navigate to UserProfileFragment using NavController
+        try {
+            val navController = requireParentFragment().findNavController()
+            val bundle = Bundle().apply { putString("userId", userId) }
+
+            // Try to navigate from current destination
+            when (navController.currentDestination?.id) {
+                R.id.homeFragment -> {
+                    navController.navigate(R.id.action_homeFragment_to_userProfileFragment, bundle)
+                }
+                R.id.postDetailFragment -> {
+                    navController.navigate(R.id.action_postDetailFragment_to_userProfileFragment, bundle)
+                }
+                else -> {
+                    // Fallback: send fragment result
+                    parentFragmentManager.setFragmentResult(
+                        "navigate_to_profile",
+                        bundle
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            // Fallback to fragment result if NavController not accessible
+            parentFragmentManager.setFragmentResult(
+                "navigate_to_profile",
+                Bundle().apply { putString("userId", userId) }
+            )
+        }
+    }
+
 
     override fun onDismiss(dialog: DialogInterface) {
         val windowDecor = (dialog as? BottomSheetDialog)

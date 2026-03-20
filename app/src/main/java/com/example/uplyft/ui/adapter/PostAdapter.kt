@@ -84,7 +84,6 @@ class PostAdapter(
         private val binding: ItemPostBinding
     ) : RecyclerView.ViewHolder(binding.root) {
 
-        private var isLiked = false
 
         fun bind(post: Post) {
 
@@ -107,16 +106,22 @@ class PostAdapter(
                 .into(binding.ivPostImage)
 
             binding.tvUsername.text   = post.username
-            binding.tvLikesCount.text = formatLikes(post.likesCount)
             binding.tvTimestamp.text  = getRelativeTime(post.createdAt)
 
-            binding.tvCommentsCount.text = when (post.commentsCount) {
-                0    -> "No comments yet"
-                1    -> "View 1 comment"
-                else -> "View all ${post.commentsCount} comments"
+            // Show like count only if > 0
+            if (post.likesCount > 0) {
+                binding.tvLikesCount.text = post.likesCount.toString()
+                binding.tvLikesCount.visibility = View.VISIBLE
+            } else {
+                binding.tvLikesCount.visibility = View.GONE
             }
-            binding.tvCommentsCount.setOnClickListener {
-                onCommentClick(post)
+
+            // Show comment count only if > 0
+            if (post.commentsCount > 0) {
+                binding.tvCommentsCount.text = post.commentsCount.toString()
+                binding.tvCommentsCount.visibility = View.VISIBLE
+            } else {
+                binding.tvCommentsCount.visibility = View.GONE
             }
 
             if (post.caption.isNotEmpty()) {
@@ -137,8 +142,7 @@ class PostAdapter(
 
             // Clicks
             binding.ivLike.setOnClickListener {
-                isLiked = !isLiked
-                animateLike(binding.ivLike, isLiked)
+                animateLike(binding.ivLike, !post.isLiked)
                 onLikeClick(post)
             }
 
@@ -147,14 +151,18 @@ class PostAdapter(
             binding.ivUserAvatar.setOnClickListener { onProfileClick(post) }
             binding.tvUsername.setOnClickListener   { onProfileClick(post) }
 
-            // Double tap to like
+            // Double tap to like with heart pop-up animation (Instagram style)
             binding.ivPostImage.setOnClickListener(object : View.OnClickListener {
                 private var lastClick = 0L
                 override fun onClick(v: View) {
                     val now = System.currentTimeMillis()
                     if (now - lastClick < 300) {
-                        if (!isLiked) {
-                            isLiked = true
+                        // Double-tap detected!
+                        // Always show heart pop-up animation (Instagram style)
+                        showHeartPopAnimation()
+
+                        // Only like if not already liked
+                        if (!post.isLiked) {
                             animateLike(binding.ivLike, true)
                             onLikeClick(post)
                         }
@@ -166,38 +174,84 @@ class PostAdapter(
 
         fun bindLike(post: Post) {
             binding.ivLike.setImageResource(
-                if (isLiked) R.drawable.ic_heart_filled
+                if (post.isLiked) R.drawable.ic_heart_filled
                 else R.drawable.ic_heart_outline
             )
-            binding.ivLike.imageTintList = if (isLiked)
+            binding.ivLike.imageTintList = if (post.isLiked)
                 ColorStateList.valueOf(Color.RED)
             else
                 ColorStateList.valueOf(
                     ContextCompat.getColor(binding.root.context,
                         R.color.on_background)
                 )
-            binding.tvLikesCount.text = formatLikes(post.likesCount)
+
+            // Update like count - show only if > 0
+            if (post.likesCount > 0) {
+                binding.tvLikesCount.text = post.likesCount.toString()
+                binding.tvLikesCount.visibility = View.VISIBLE
+            } else {
+                binding.tvLikesCount.visibility = View.GONE
+            }
         }
 
-        // Bounce animation on like
+        // Smooth Instagram-style like animation
         private fun animateLike(view: View, liked: Boolean) {
             if (liked) {
+                // Scale up then down with overshoot
                 view.animate()
-                    .scaleX(1.3f).scaleY(1.3f).setDuration(100)
+                    .scaleX(1.3f).scaleY(1.3f)
+                    .setDuration(150)
                     .withEndAction {
-                        view.animate().scaleX(1f).scaleY(1f).setDuration(100).start()
+                        view.animate()
+                            .scaleX(1f).scaleY(1f)
+                            .setDuration(150)
+                            .start()
                     }.start()
             }
         }
 
-        private fun formatLikes(count: Int): String {
-            return when {
-                count >= 1_000_000 -> "${count / 1_000_000}M likes"
-                count >= 1_000     -> "${count / 1_000}K likes"
-                count == 1         -> "1 like"
-                else               -> "$count likes"
+        // Instagram-style heart pop-up animation over the image
+        private fun showHeartPopAnimation() {
+            binding.ivHeartOverlay.apply {
+                visibility = View.VISIBLE
+                alpha = 0f
+                scaleX = 0f
+                scaleY = 0f
+
+                // Phase 1: Pop in with overshoot (0 -> 1.2)
+                animate()
+                    .alpha(1f)
+                    .scaleX(1.2f)
+                    .scaleY(1.2f)
+                    .setDuration(250)
+                    .setInterpolator(android.view.animation.OvershootInterpolator(2f))
+                    .withEndAction {
+                        // Phase 2: Settle to normal size (1.2 -> 1.0)
+                        animate()
+                            .scaleX(1.0f)
+                            .scaleY(1.0f)
+                            .setDuration(150)
+                            .setInterpolator(android.view.animation.DecelerateInterpolator())
+                            .withEndAction {
+                                // Phase 3: Hold briefly then fade out
+                                animate()
+                                    .alpha(0f)
+                                    .scaleX(1.2f)
+                                    .scaleY(1.2f)
+                                    .setDuration(250)
+                                    .setStartDelay(100)
+                                    .setInterpolator(android.view.animation.AccelerateInterpolator())
+                                    .withEndAction {
+                                        visibility = View.GONE
+                                    }
+                                    .start()
+                            }
+                            .start()
+                    }
+                    .start()
             }
         }
+
 
         private fun getRelativeTime(timestamp: Long): String {
             val diff = System.currentTimeMillis() - timestamp

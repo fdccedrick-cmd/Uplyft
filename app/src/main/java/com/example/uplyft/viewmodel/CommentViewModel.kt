@@ -11,7 +11,6 @@ import com.example.uplyft.domain.model.User
 import com.example.uplyft.utils.Resource
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ktx.toObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -35,6 +34,10 @@ class CommentViewModel(application: Application) : AndroidViewModel(application)
     private var currentPostId: String? = null
     private var listenerJobActive = false
 
+    // Instagram's approach: Track which comments are being synced to Firestore
+    private val syncingLikes = mutableSetOf<String>()
+
+
     /* ================= LOAD ================= */
 
     fun loadComments(postId: String) {
@@ -42,17 +45,32 @@ class CommentViewModel(application: Application) : AndroidViewModel(application)
             currentPostId = postId
             listenerJobActive = false
             _comments.value = emptyList()
+            syncingLikes.clear()
         }
 
         if (listenerJobActive) return
         listenerJobActive = true
 
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+
         viewModelScope.launch {
             try {
-                commentSource.observeComments(postId).collect { firestoreList ->
+                commentSource.observeComments(postId, currentUserId).collect { firestoreList ->
                     val pending = _comments.value.filter { it.isPending }
+                    val current = _comments.value
 
-                    _comments.value = (firestoreList + pending)
+                    // Instagram's approach: Only update comments that aren't being synced
+                    val updated = firestoreList.map { firestore ->
+                        if (syncingLikes.contains(firestore.commentId)) {
+                            // Keep local optimistic state while syncing
+                            current.find { it.commentId == firestore.commentId } ?: firestore
+                        } else {
+                            // Use Firestore data
+                            firestore
+                        }
+                    }
+
+                    _comments.value = (updated + pending)
                         .distinctBy { it.commentId }
                         .sortedBy { it.createdAt }
                 }
@@ -156,27 +174,56 @@ class CommentViewModel(application: Application) : AndroidViewModel(application)
     fun toggleCommentLike(comment: Comment) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
 
-        viewModelScope.launch {
+        // Instagram's approach: Calculate new state based on CURRENT UI state
+        val currentComment = _comments.value.find { it.commentId == comment.commentId } ?: comment
+        val newIsLiked = !currentComment.isLiked
+        val newCount = if (newIsLiked) currentComment.likesCount + 1 else currentComment.likesCount - 1
+
+        // Mark as syncing
+        syncingLikes.add(comment.commentId)
+
+        // Update UI immediately
+        _comments.value = _comments.value.map { c ->
+            if (c.commentId == comment.commentId) {
+                c.copy(isLiked = newIsLiked, likesCount = newCount)
+            } else c
+        }
+
+        // Sync to Firestore in background
+        viewModelScope.launch(Dispatchers.IO) {
             try {
-                withContext(Dispatchers.IO) {
-                    val ref = FirebaseFirestore.getInstance()
-                        .collection(POSTS_COLLECTION)
-                        .document(comment.postId)
-                        .collection("comments")
-                        .document(comment.commentId)
+                val ref = FirebaseFirestore.getInstance()
+                    .collection(POSTS_COLLECTION)
+                    .document(comment.postId)
+                    .collection("comments")
+                    .document(comment.commentId)
 
-                    val likeRef = ref.collection("likes").document(uid)
-                    val exists = likeRef.get().await().exists()
+                val likeRef = ref.collection("likes").document(uid)
 
-                    if (exists) {
-                        likeRef.delete().await()
-                        ref.update("likesCount", FieldValue.increment(-1)).await()
-                    } else {
-                        likeRef.set(mapOf("likedAt" to System.currentTimeMillis())).await()
-                        ref.update("likesCount", FieldValue.increment(1)).await()
+                if (newIsLiked) {
+                    likeRef.set(mapOf("likedAt" to System.currentTimeMillis())).await()
+                    ref.update("likesCount", FieldValue.increment(1)).await()
+                } else {
+                    likeRef.delete().await()
+                    ref.update("likesCount", FieldValue.increment(-1)).await()
+                }
+
+                // Only remove from syncing after successful sync
+                kotlinx.coroutines.delay(500) // Small delay for Firestore propagation
+                syncingLikes.remove(comment.commentId)
+
+            } catch (_: Exception) {
+                // On error, remove from syncing and revert
+                syncingLikes.remove(comment.commentId)
+
+                withContext(Dispatchers.Main) {
+                    _comments.value = _comments.value.map { c ->
+                        if (c.commentId == comment.commentId) {
+                            c.copy(isLiked = currentComment.isLiked, likesCount = currentComment.likesCount)
+                        } else c
                     }
                 }
-            } catch (_: Exception) {}
+            }
         }
     }
 
@@ -208,4 +255,4 @@ class CommentViewModel(application: Application) : AndroidViewModel(application)
                     ?.copy(uid = uid)
         }
     }
-}
+

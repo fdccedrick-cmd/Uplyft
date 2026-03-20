@@ -11,8 +11,9 @@ import com.example.uplyft.data.local.dao.PostDao
 import com.example.uplyft.data.local.entity.PostEntity
 import com.example.uplyft.data.local.dao.FollowDao
 import com.example.uplyft.data.local.entity.FollowEntity
+
 @Database(
-    entities = [PostEntity::class, UserEntity::class , FollowEntity::class],
+    entities = [PostEntity::class, UserEntity::class, FollowEntity::class],
     version = 7,
     exportSchema = false
 )

@@ -39,7 +39,8 @@ class CommentAdapter(
             // Return payload when only like state changed
             override fun getChangePayload(oldItem: Comment, newItem: Comment): Any? {
                 return if (oldItem.isLiked != newItem.isLiked ||
-                          oldItem.likesCount != newItem.likesCount) {
+                          oldItem.likesCount != newItem.likesCount ||
+                          oldItem.replyCount != newItem.replyCount) {
                     "like_update"
                 } else null
             }
@@ -47,8 +48,27 @@ class CommentAdapter(
     }
 
     fun submitFullList(list: List<Comment>) {
+        val oldAllComments = allComments
         allComments = list
-        submitList(list.filter { it.parentId.isEmpty() })
+
+        val topLevel = list.filter { it.parentId.isEmpty() }
+        submitList(topLevel)
+
+        // Check if any reply likes changed - notify parent to rebuild
+        val oldReplies = oldAllComments.filter { it.parentId.isNotEmpty() }
+        val newReplies = list.filter { it.parentId.isNotEmpty() }
+
+        newReplies.forEach { newReply ->
+            val oldReply = oldReplies.find { it.commentId == newReply.commentId }
+            if (oldReply != null &&
+                (oldReply.isLiked != newReply.isLiked || oldReply.likesCount != newReply.likesCount)) {
+                // Reply like state changed - find and notify parent
+                val parentIndex = topLevel.indexOfFirst { it.commentId == newReply.parentId }
+                if (parentIndex != -1) {
+                    notifyItemChanged(parentIndex, "like_update")
+                }
+            }
+        }
     }
 
     fun updateCurrentUsername(username: String) {
@@ -64,7 +84,10 @@ class CommentAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int, payloads: MutableList<Any>) {
         if (payloads.contains("like_update")) {
-            holder.bindLike(getItem(position))
+            val comment = getItem(position)
+            holder.bindLike(comment)
+            // Also rebuild replies to show updated like states
+            holder.rebindReplies(comment)
         } else {
             super.onBindViewHolder(holder, position, payloads)
         }
@@ -229,6 +252,17 @@ class CommentAdapter(
 
                 b.tvCommentText.text            = span
                 b.tvCommentText.movementMethod  = LinkMovementMethod.getInstance()
+            }
+        }
+
+        fun rebindReplies(c: Comment) {
+            // Only rebuild if currently expanded
+            if (expanded.contains(c.commentId) && b.layoutReplies.visibility == View.VISIBLE) {
+                val replies = allComments.filter { it.parentId == c.commentId }
+                if (replies.isNotEmpty()) {
+                    b.layoutReplies.removeAllViews()
+                    buildReplyViews(replies)
+                }
             }
         }
 

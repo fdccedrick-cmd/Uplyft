@@ -18,13 +18,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.example.uplyft.utils.PostUploadState
 import kotlinx.coroutines.launch
-
+import androidx.fragment.app.activityViewModels
+import com.google.android.material.bottomnavigation.BottomNavigationView
 class CreatePostFragment : Fragment() {
 
-    private var _binding: FragmentCreatePostBinding? = null
+    private var _binding : FragmentCreatePostBinding? = null
     private val binding get() = _binding!!
-    private var imageUri: Uri? = null
-    private val postViewModel: PostViewModel by viewModels()
+    private val postViewModel: PostViewModel by activityViewModels()
+    private var imageUris: List<Uri> = emptyList()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -37,49 +38,54 @@ class CreatePostFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Receive URI from SelectImageFragment
-        arguments?.getString("imageUri")?.let { uriString ->
-            imageUri = Uri.parse(uriString)
-            Glide.with(this).load(imageUri).centerCrop().into(binding.ivThumbnail)
+        val uriStrings = arguments?.getStringArrayList("imageUris") ?: arrayListOf()
+        imageUris = uriStrings.map { Uri.parse(it) }
+
+        if (imageUris.isNotEmpty()) {
+            // show first image as thumbnail
+            Glide.with(this).load(imageUris.first())
+                .centerCrop().into(binding.ivThumbnail)
+
+            // show badge if multiple
+            if (imageUris.size > 1) {
+                binding.ivMultiBadge.visibility = View.VISIBLE
+            }
         }
 
-        binding.ivBack.setOnClickListener {
-            findNavController().popBackStack()
-        }
+        binding.ivBack.setOnClickListener { findNavController().popBackStack() }
 
         binding.tvShare.setOnClickListener {
             val caption = binding.etCaption.text.toString().trim()
-            imageUri?.let { uri ->
-                postViewModel.createPost(uri, caption)
-            }
+            if (imageUris.isEmpty()) return@setOnClickListener
+            postViewModel.createPost(imageUris, caption)
         }
+
         observeUploadState()
     }
+
     private fun observeUploadState() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 postViewModel.uploadState.collect { state ->
                     when (state) {
-                        is PostUploadState.Saving -> {
-                            binding.progressBar.visibility = View.VISIBLE
-                            binding.tvShare.isEnabled = false
-                            showToast("Saving...")
-                        }
-                        is PostUploadState.Uploading -> {
-                            showToast("Uploading image...")
-                        }
+                        is PostUploadState.Saving,
+                        is PostUploadState.Uploading,
                         is PostUploadState.Syncing -> {
-                            showToast("Almost done...")
+                            binding.progressBar.visibility = View.VISIBLE
+                            binding.tvShare.isEnabled      = false
                         }
                         is PostUploadState.Done -> {
                             binding.progressBar.visibility = View.GONE
-                            // Navigate back to home feed
-                            findNavController().navigate(R.id.homeFragment)
+                            requireActivity()
+                                .findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(
+                                    R.id.bottomNavigationView
+                                ).selectedItemId = R.id.homeFragment
                         }
                         is PostUploadState.Error -> {
                             binding.progressBar.visibility = View.GONE
-                            binding.tvShare.isEnabled = true
-                            showToast("Failed: ${state.message}")
+                            binding.tvShare.isEnabled      = true
+                            Toast.makeText(requireContext(),
+                                state.message, Toast.LENGTH_SHORT).show()
                         }
                         null -> Unit
                     }
@@ -87,10 +93,6 @@ class CreatePostFragment : Fragment() {
             }
         }
     }
-
-    private fun showToast(msg: String) =
-        Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
-
 
     override fun onDestroyView() {
         super.onDestroyView()

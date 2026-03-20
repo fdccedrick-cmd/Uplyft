@@ -17,6 +17,7 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.example.uplyft.R
 import com.example.uplyft.databinding.ItemPostBinding
 import com.example.uplyft.domain.model.Post
+import androidx.viewpager2.widget.ViewPager2
 
 
 class PostAdapter(
@@ -28,29 +29,25 @@ class PostAdapter(
 
     private val posts = mutableListOf<Post>()
 
-    // DiffUtil — only redraws what actually changed
     fun submitList(newPosts: List<Post>) {
         val diff = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
             override fun getOldListSize() = posts.size
             override fun getNewListSize() = newPosts.size
-
-            override fun areItemsTheSame(oldPos: Int, newPos: Int) =
-                posts[oldPos].postId == newPosts[newPos].postId
-
-            override fun areContentsTheSame(oldPos: Int, newPos: Int) =
-                posts[oldPos] == newPosts[newPos]
+            override fun areItemsTheSame(o: Int, n: Int) =
+                posts[o].postId == newPosts[n].postId
+            override fun areContentsTheSame(o: Int, n: Int) =
+                posts[o] == newPosts[n]
         })
         posts.clear()
         posts.addAll(newPosts)
-        diff.dispatchUpdatesTo(this)   // only animates changed rows
+        diff.dispatchUpdatesTo(this)
     }
 
-    // Optimistic like update — instant UI, no waiting for server
     fun updateLike(postId: String, liked: Boolean, newCount: Int) {
         val index = posts.indexOfFirst { it.postId == postId }
         if (index != -1) {
             posts[index] = posts[index].copy(likesCount = newCount)
-            notifyItemChanged(index, "like_payload")   // partial update
+            notifyItemChanged(index, "like_payload")
         }
     }
 
@@ -67,7 +64,6 @@ class PostAdapter(
         holder.bind(posts[position])
     }
 
-    // Partial bind — only re-draws like button, not entire row
     override fun onBindViewHolder(
         holder: PostViewHolder,
         position: Int,
@@ -84,52 +80,53 @@ class PostAdapter(
         private val binding: ItemPostBinding
     ) : RecyclerView.ViewHolder(binding.root) {
 
-
+        // ✅ single clean bind — handles both single and multiple images
         fun bind(post: Post) {
 
-            binding.tvUsername.text= post.username.ifEmpty { "User" }
-            // Profile image
+            // ── Avatar ──────────────────────────────────────
             Glide.with(binding.root)
-                .load(post.userImageUrl.ifEmpty { null })   // null triggers placeholder
+                .load(post.userImageUrl.ifEmpty { null })
                 .placeholder(R.drawable.ic_profile)
                 .error(R.drawable.ic_profile)
                 .circleCrop()
                 .diskCacheStrategy(DiskCacheStrategy.ALL)
                 .into(binding.ivUserAvatar)
 
-            // Post image — with caching
-            Glide.with(binding.root)
-                .load(post.imageUrl)
-                .placeholder(R.color.surface)
-                .centerCrop()
-                .diskCacheStrategy(DiskCacheStrategy.ALL)   // cache full + thumbnail
-                .into(binding.ivPostImage)
+            // ── Username + Timestamp ─────────────────────────
+            binding.tvUsername.text  = post.username.ifEmpty { "User" }
+            binding.tvTimestamp.text = getRelativeTime(post.createdAt)
 
-            binding.tvUsername.text   = post.username
-            binding.tvTimestamp.text  = getRelativeTime(post.createdAt)
+            // ── Images — carousel or single ──────────────────
+            val urls = post.imageUrls.ifEmpty { listOf(post.imageUrl) }
+                .filter { it.isNotBlank() }
 
-            // Show like count only if > 0
-            if (post.likesCount > 0) {
-                binding.tvLikesCount.text = post.likesCount.toString()
-                binding.tvLikesCount.visibility = View.VISIBLE
+            val imageAdapter = PostImageAdapter(urls)
+            binding.vpPostImages.adapter = imageAdapter
+
+            if (urls.size > 1) {
+                binding.dotsIndicator.visibility = View.VISIBLE
+                binding.tvImageCount.visibility  = View.VISIBLE
+                binding.tvImageCount.text        = "1/${urls.size}"
+                binding.dotsIndicator.attachTo(binding.vpPostImages)
+
+                binding.vpPostImages.registerOnPageChangeCallback(
+                    object : ViewPager2.OnPageChangeCallback() {
+                        override fun onPageSelected(pos: Int) {
+                            binding.tvImageCount.text = "${pos + 1}/${urls.size}"
+                        }
+                    }
+                )
             } else {
-                binding.tvLikesCount.visibility = View.GONE
+                binding.dotsIndicator.visibility = View.GONE
+                binding.tvImageCount.visibility  = View.GONE
             }
 
-            // Show comment count only if > 0
-            if (post.commentsCount > 0) {
-                binding.tvCommentsCount.text = post.commentsCount.toString()
-                binding.tvCommentsCount.visibility = View.VISIBLE
-            } else {
-                binding.tvCommentsCount.visibility = View.GONE
-            }
-
+            // ── Caption ──────────────────────────────────────
             if (post.caption.isNotEmpty()) {
                 val displayName = post.username.ifEmpty { "User" }
                 val full = SpannableString("$displayName ${post.caption}")
                 full.setSpan(
-                    StyleSpan(Typeface.BOLD),
-                    0, displayName.length,
+                    StyleSpan(Typeface.BOLD), 0, displayName.length,
                     Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
                 binding.tvCaption.text       = full
@@ -138,32 +135,44 @@ class PostAdapter(
                 binding.tvCaption.visibility = View.GONE
             }
 
-            bindLike(post)
+            // ── Likes count ──────────────────────────────────
+            binding.tvLikesCount.text = if (post.likesCount > 0)
+                formatLikes(post.likesCount)
+            else
+                ""
+            binding.tvLikesCount.visibility =
+                if (post.likesCount > 0) View.VISIBLE else View.GONE
 
-            // Clicks
-            binding.ivLike.setOnClickListener {
-                animateLike(binding.ivLike, !post.isLiked)
-                onLikeClick(post)
+            // ── Comments count ───────────────────────────────
+            binding.tvCommentsCount.text = when (post.commentsCount) {
+                0    -> "No comments yet"
+                1    -> "View 1 comment"
+                else -> "View all ${post.commentsCount} comments"
             }
 
-            binding.ivComment.setOnClickListener    { onCommentClick(post) }
-            binding.ivShare.setOnClickListener      { onShareClick(post) }
-            binding.ivUserAvatar.setOnClickListener { onProfileClick(post) }
-            binding.tvUsername.setOnClickListener   { onProfileClick(post) }
+            // ── Like state ───────────────────────────────────
+            bindLike(post)
 
-            // Double tap to like with heart pop-up animation (Instagram style)
-            binding.ivPostImage.setOnClickListener(object : View.OnClickListener {
+            // ── Click listeners ──────────────────────────────
+            binding.ivLike.setOnClickListener {
+                animateLike(binding.ivLike)
+                onLikeClick(post)
+            }
+            binding.tvCommentsCount.setOnClickListener { onCommentClick(post) }
+            binding.ivComment.setOnClickListener       { onCommentClick(post) }
+            binding.ivShare.setOnClickListener         { onShareClick(post) }
+            binding.ivUserAvatar.setOnClickListener    { onProfileClick(post) }
+            binding.tvUsername.setOnClickListener      { onProfileClick(post) }
+
+            // ── Double tap to like ───────────────────────────
+            binding.vpPostImages.setOnClickListener(object : View.OnClickListener {
                 private var lastClick = 0L
                 override fun onClick(v: View) {
                     val now = System.currentTimeMillis()
                     if (now - lastClick < 300) {
-                        // Double-tap detected!
-                        // Always show heart pop-up animation (Instagram style)
                         showHeartPopAnimation()
-
-                        // Only like if not already liked
                         if (!post.isLiked) {
-                            animateLike(binding.ivLike, true)
+                            animateLike(binding.ivLike)
                             onLikeClick(post)
                         }
                     }
@@ -181,86 +190,59 @@ class PostAdapter(
                 ColorStateList.valueOf(Color.RED)
             else
                 ColorStateList.valueOf(
-                    ContextCompat.getColor(binding.root.context,
-                        R.color.on_background)
+                    ContextCompat.getColor(binding.root.context, R.color.on_background)
                 )
-
-            // Update like count - show only if > 0
-            if (post.likesCount > 0) {
-                binding.tvLikesCount.text = post.likesCount.toString()
-                binding.tvLikesCount.visibility = View.VISIBLE
-            } else {
-                binding.tvLikesCount.visibility = View.GONE
-            }
         }
 
-        // Smooth Instagram-style like animation
-        private fun animateLike(view: View, liked: Boolean) {
-            if (liked) {
-                // Scale up then down with overshoot
-                view.animate()
-                    .scaleX(1.3f).scaleY(1.3f)
-                    .setDuration(150)
+        private fun animateLike(view: View) {
+            view.animate()
+                .scaleX(1.3f).scaleY(1.3f).setDuration(150)
+                .withEndAction {
+                    view.animate().scaleX(1f).scaleY(1f).setDuration(150).start()
+                }.start()
+        }
+
+        private fun showHeartPopAnimation() {
+            binding.ivHeartOverlay.apply {
+                visibility = View.VISIBLE
+                alpha      = 0f
+                scaleX     = 0f
+                scaleY     = 0f
+                animate()
+                    .alpha(1f).scaleX(1.2f).scaleY(1.2f)
+                    .setDuration(250)
+                    .setInterpolator(android.view.animation.OvershootInterpolator(2f))
                     .withEndAction {
-                        view.animate()
-                            .scaleX(1f).scaleY(1f)
-                            .setDuration(150)
-                            .start()
+                        animate()
+                            .scaleX(1f).scaleY(1f).setDuration(150)
+                            .setInterpolator(android.view.animation.DecelerateInterpolator())
+                            .withEndAction {
+                                animate()
+                                    .alpha(0f).scaleX(1.2f).scaleY(1.2f)
+                                    .setDuration(250).setStartDelay(100)
+                                    .setInterpolator(android.view.animation.AccelerateInterpolator())
+                                    .withEndAction { visibility = View.GONE }
+                                    .start()
+                            }.start()
                     }.start()
             }
         }
 
-        // Instagram-style heart pop-up animation over the image
-        private fun showHeartPopAnimation() {
-            binding.ivHeartOverlay.apply {
-                visibility = View.VISIBLE
-                alpha = 0f
-                scaleX = 0f
-                scaleY = 0f
-
-                // Phase 1: Pop in with overshoot (0 -> 1.2)
-                animate()
-                    .alpha(1f)
-                    .scaleX(1.2f)
-                    .scaleY(1.2f)
-                    .setDuration(250)
-                    .setInterpolator(android.view.animation.OvershootInterpolator(2f))
-                    .withEndAction {
-                        // Phase 2: Settle to normal size (1.2 -> 1.0)
-                        animate()
-                            .scaleX(1.0f)
-                            .scaleY(1.0f)
-                            .setDuration(150)
-                            .setInterpolator(android.view.animation.DecelerateInterpolator())
-                            .withEndAction {
-                                // Phase 3: Hold briefly then fade out
-                                animate()
-                                    .alpha(0f)
-                                    .scaleX(1.2f)
-                                    .scaleY(1.2f)
-                                    .setDuration(250)
-                                    .setStartDelay(100)
-                                    .setInterpolator(android.view.animation.AccelerateInterpolator())
-                                    .withEndAction {
-                                        visibility = View.GONE
-                                    }
-                                    .start()
-                            }
-                            .start()
-                    }
-                    .start()
-            }
+        private fun formatLikes(count: Int): String = when {
+            count >= 1_000_000 -> "${count / 1_000_000}M likes"
+            count >= 1_000     -> "${count / 1_000}K likes"
+            count == 1         -> "1 like"
+            else               -> "$count likes"
         }
-
 
         private fun getRelativeTime(timestamp: Long): String {
             val diff = System.currentTimeMillis() - timestamp
             return when {
-                diff < 60_000              -> "Just now"
-                diff < 3_600_000           -> "${diff / 60_000}m ago"
-                diff < 86_400_000          -> "${diff / 3_600_000}h ago"
-                diff < 604_800_000         -> "${diff / 86_400_000}d ago"
-                else                       -> "${diff / 604_800_000}w ago"
+                diff < 60_000      -> "Just now"
+                diff < 3_600_000   -> "${diff / 60_000}m ago"
+                diff < 86_400_000  -> "${diff / 3_600_000}h ago"
+                diff < 604_800_000 -> "${diff / 86_400_000}d ago"
+                else               -> "${diff / 604_800_000}w ago"
             }
         }
     }

@@ -67,16 +67,45 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <ImageView
-            android:id="@+id/ivPostImage"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="centerCrop"
-            android:background="@color/surface"
-            app:layout_constraintTop_toTopOf="parent"
+        <!-- ✅ Carousel — replaces single ivPostImage -->
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/vpPostImages"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            app:layout_constraintDimensionRatio="1:1"
+            app:layout_constraintTop_toBottomOf="@id/layoutPostHeader"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"/>
+
+        <!-- dots indicator -->
+        <com.tbuonomo.viewpagerdotsindicator.DotsIndicator
+            android:id="@+id/dotsIndicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            app:dotsColor="@android:color/white"
+            app:dotsSize="6dp"
+            app:dotsSpacing="4dp"
+            app:selectedDotColor="@android:color/white"
+            app:layout_constraintBottom_toBottomOf="@id/vpPostImages"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"/>
+            android:layout_marginBottom="8dp"/>
+
+        <TextView
+            android:id="@+id/tvImageCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="@android:color/white"
+            android:background="#66000000"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:visibility="gone"
+            app:layout_constraintTop_toBottomOf="@id/layoutPostHeader"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_margin="10dp"/>
+
 
         <!-- Heart overlay for double-tap animation (Instagram style) -->
         <ImageView

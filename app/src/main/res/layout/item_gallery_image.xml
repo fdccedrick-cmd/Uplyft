@@ -1,13 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="wrap_content"
+    android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:padding="1dp">
 
     <ImageView
         android:id="@+id/ivGalleryImage"
-        android:layout_width="120dp"
+        android:layout_width="match_parent"
         android:layout_height="120dp"
         android:scaleType="centerCrop"/>
+
+    <!-- dim overlay when not selected in multi mode -->
+    <View
+        android:id="@+id/vDimOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#55000000"
+        android:visibility="gone"/>
+
+    <!-- unselected circle -->
+    <View
+        android:id="@+id/vUnselected"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="6dp"
+        android:background="@drawable/bg_unselected_circle"
+        android:visibility="gone"/>
+
+    <!-- selection order badge -->
+    <TextView
+        android:id="@+id/tvSelectionOrder"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="6dp"
+        android:gravity="center"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:textColor="@android:color/white"
+        android:background="@drawable/bg_selection_badge"
+        android:visibility="gone"/>
 
 </FrameLayout>

@@ -82,11 +82,11 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun createPost(imageUri: Uri, caption: String) {
+    fun createPost(imageUris: List<Uri>, caption: String) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         viewModelScope.launch {
             repository.createPost(
-                imageUri   = imageUri,
+                imageUris  = imageUris,
                 caption    = caption,
                 userId     = userId,
                 onProgress = { _uploadState.value = it }

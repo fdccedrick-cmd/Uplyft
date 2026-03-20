@@ -96,4 +96,6 @@ dependencies {
 
     //GIF
     implementation("com.giphy.sdk:ui:2.3.14")
+
+    implementation("com.tbuonomo:dotsindicator:5.0")
 }

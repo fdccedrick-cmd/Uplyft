@@ -8,20 +8,27 @@ import android.view.ViewGroup
 import com.example.uplyft.R
 import android.widget.ImageView
 import com.bumptech.glide.Glide
+import com.example.uplyft.databinding.ItemGalleryImageBinding
+
 
 // ui/adapter/GalleryAdapter.kt
 class GalleryAdapter(
-    private val onImageSelected: (Uri) -> Unit,
-    private val onCameraClick: () -> Unit
+    private val onImageSelected : (Uri) -> Unit,
+    private val onCameraClick   : () -> Unit,
+    private val onMultiSelected : (List<Uri>) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     companion object {
         private const val TYPE_CAMERA = 0
         private const val TYPE_IMAGE  = 1
+        const val MAX_SELECT          = 10
     }
 
-    private val images = mutableListOf<Uri>()
+    private val images          = mutableListOf<Uri>()
     private var selectedPosition = 1
+    var isMultiSelectMode        = false
+        private set
+    private val selectedUris    = mutableListOf<Uri>()
 
     fun submitList(uris: List<Uri>) {
         images.clear()
@@ -29,43 +36,89 @@ class GalleryAdapter(
         notifyDataSetChanged()
     }
 
-    // Total = camera tile + images
-    override fun getItemCount() = images.size + 1
+    fun toggleMultiSelect(): Boolean {
+        isMultiSelectMode = !isMultiSelectMode
+        if (!isMultiSelectMode) selectedUris.clear()
+        notifyDataSetChanged()
+        return isMultiSelectMode
+    }
 
+    fun getSelectedUris(): List<Uri> = selectedUris.toList()
+
+    override fun getItemCount() = images.size + 1
     override fun getItemViewType(position: Int) =
         if (position == 0) TYPE_CAMERA else TYPE_IMAGE
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         val inflater = LayoutInflater.from(parent.context)
         return if (viewType == TYPE_CAMERA) {
-            val view = inflater.inflate(R.layout.item_gallery_camera, parent, false)
-            CameraViewHolder(view)
+            CameraViewHolder(
+                inflater.inflate(R.layout.item_gallery_camera, parent, false)
+            )
         } else {
-            val view = inflater.inflate(R.layout.item_gallery_image, parent, false)
-            ImageViewHolder(view)
+            ImageViewHolder(
+                ItemGalleryImageBinding.inflate(inflater, parent, false)
+            )
         }
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         when (holder) {
-            is CameraViewHolder -> {
-                holder.itemView.setOnClickListener { onCameraClick() }
-            }
-            is ImageViewHolder -> {
-                // position - 1 because position 0 is camera
-                val uri = images[position - 1]
+            is CameraViewHolder -> holder.itemView.setOnClickListener { onCameraClick() }
+            is ImageViewHolder  -> holder.bind(images[position - 1], position)
+        }
+    }
 
-                Glide.with(holder.itemView)
-                    .load(uri)
-                    .centerCrop()
-                    .into(holder.imageView)
+    inner class ImageViewHolder(
+        private val binding: ItemGalleryImageBinding
+    ) : RecyclerView.ViewHolder(binding.root) {
 
-                // Dim unselected
-                holder.itemView.alpha = if (position == selectedPosition) 1f else 0.6f
+        fun bind(uri: Uri, position: Int) {
+            Glide.with(binding.root)
+                .load(uri)
+                .centerCrop()
+                .into(binding.ivGalleryImage)
 
-                holder.itemView.setOnClickListener {
-                    val prev = selectedPosition
-                    selectedPosition = holder.bindingAdapterPosition
+            if (isMultiSelectMode) {
+                // show circle indicators
+                val selectionIndex = selectedUris.indexOf(uri)
+                val isSelected     = selectionIndex != -1
+
+                binding.vUnselected.visibility      =
+                    if (isSelected) View.GONE else View.VISIBLE
+                binding.tvSelectionOrder.visibility =
+                    if (isSelected) View.VISIBLE else View.GONE
+                binding.vDimOverlay.visibility      =
+                    if (isSelected) View.GONE else View.VISIBLE
+
+                if (isSelected) {
+                    binding.tvSelectionOrder.text = (selectionIndex + 1).toString()
+                }
+
+                binding.root.setOnClickListener {
+                    val idx = selectedUris.indexOf(uri)
+                    if (idx != -1) {
+                        selectedUris.removeAt(idx)
+                    } else {
+                        if (selectedUris.size >= MAX_SELECT) return@setOnClickListener
+                        selectedUris.add(uri)
+                        onImageSelected(selectedUris.first())
+                    }
+                    onMultiSelected(selectedUris.toList())
+                    notifyDataSetChanged()
+                }
+            } else {
+                // single select mode
+                binding.vUnselected.visibility      = View.GONE
+                binding.tvSelectionOrder.visibility = View.GONE
+                binding.vDimOverlay.visibility      = View.GONE
+                binding.root.alpha = if (position == selectedPosition) 1f else 0.7f
+
+                binding.root.setOnClickListener {
+                    val newPos = bindingAdapterPosition
+                    if (newPos == RecyclerView.NO_ID.toInt()) return@setOnClickListener
+                    val prev         = selectedPosition
+                    selectedPosition = newPos
                     notifyItemChanged(prev)
                     notifyItemChanged(selectedPosition)
                     onImageSelected(uri)
@@ -74,10 +127,5 @@ class GalleryAdapter(
         }
     }
 
-    // ViewHolders
     class CameraViewHolder(view: View) : RecyclerView.ViewHolder(view)
-
-    class ImageViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val imageView: ImageView = view.findViewById(R.id.ivGalleryImage)
-    }
 }

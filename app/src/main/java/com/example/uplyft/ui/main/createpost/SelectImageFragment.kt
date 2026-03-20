@@ -40,21 +40,20 @@ class SelectImageFragment : Fragment() {
     private val binding get() = _binding!!
 
     private lateinit var permissionManager: PermissionManager
-    private lateinit var galleryAdapter: GalleryAdapter
+    private lateinit var galleryAdapter   : GalleryAdapter
 
-    private var selectedUri: Uri? = null
-    private var cameraImageUri: Uri? = null
+    private var selectedUri    : Uri?    = null
+    private var cameraImageUri : Uri?    = null
+    private var isMultiMode    : Boolean = false
 
     private val cameraLauncher = registerForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { success ->
         if (success && cameraImageUri != null) {
-            selectedUri = cameraImageUri
+            selectedUri               = cameraImageUri
             binding.tvNext.visibility = View.VISIBLE
-            Glide.with(this)
-                .load(cameraImageUri)
-                .centerCrop()
-                .into(binding.ivPreview)
+            Glide.with(this).load(cameraImageUri)
+                .centerCrop().into(binding.ivPreview)
         }
     }
 
@@ -69,13 +68,9 @@ class SelectImageFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         permissionManager = PermissionManager(this)
-
         setupGalleryGrid()
+        checkPermissionAndLoad()
         setupClickListeners()
-
-        permissionManager.requestGallery(
-            onGranted = { loadGalleryImages() }
-        )
     }
 
     private fun setupClickListeners() {
@@ -83,91 +78,109 @@ class SelectImageFragment : Fragment() {
             findNavController().popBackStack()
         }
 
-        binding.tvNext.setOnClickListener {
-            selectedUri?.let { uri ->
-                val bundle = Bundle().apply {
-                    putString("imageUri", uri.toString())
-                }
-                findNavController().navigate(
-                    R.id.action_selectImageFragment_to_createPostFragment,
-                    bundle
-                )
+        // ✅ toggle multi-select
+        binding.tvSelect.setOnClickListener {
+            isMultiMode = galleryAdapter.toggleMultiSelect()
+            if (isMultiMode) {
+                binding.tvSelect.text            = "Cancel"
+                binding.tvSelectedCount.visibility = View.GONE
+                binding.tvNext.visibility          = View.GONE
+            } else {
+                binding.tvSelect.text              = "Select"
+                binding.tvSelectedCount.visibility = View.GONE
+                // restore single select next button if image selected
+                selectedUri?.let { binding.tvNext.visibility = View.VISIBLE }
             }
+        }
+
+        binding.tvNext.setOnClickListener {
+            val uris = if (isMultiMode) {
+                galleryAdapter.getSelectedUris()
+            } else {
+                listOf(selectedUri ?: return@setOnClickListener)
+            }
+            if (uris.isEmpty()) return@setOnClickListener
+
+            val bundle = Bundle().apply {
+                putStringArrayList("imageUris", ArrayList(uris.map { it.toString() }))
+            }
+            findNavController().navigate(
+                R.id.action_selectImageFragment_to_createPostFragment, bundle
+            )
         }
     }
 
     private fun setupGalleryGrid() {
         galleryAdapter = GalleryAdapter(
             onImageSelected = { uri ->
-                selectedUri = uri
+                selectedUri               = uri
                 binding.tvNext.visibility = View.VISIBLE
-                Glide.with(this)
-                    .load(uri)
-                    .centerCrop()
-                    .into(binding.ivPreview)
+                Glide.with(this).load(uri).centerCrop().into(binding.ivPreview)
             },
-            onCameraClick = {
-                permissionManager.requestCamera(
-                    onGranted = { openCamera() }
-                )
+            onCameraClick   = {
+                permissionManager.requestCamera(onGranted = { openCamera() })
+            },
+            onMultiSelected = { uris ->
+                if (uris.isEmpty()) {
+                    binding.tvNext.visibility          = View.GONE
+                    binding.tvSelectedCount.visibility = View.GONE
+                } else {
+                    binding.tvNext.visibility          = View.VISIBLE
+                    binding.tvSelectedCount.visibility = View.VISIBLE
+                    binding.tvSelectedCount.text       = "${uris.size}/10"
+                    Glide.with(this).load(uris.first())
+                        .centerCrop().into(binding.ivPreview)
+                }
             }
         )
-
         binding.rvGallery.apply {
             layoutManager = GridLayoutManager(requireContext(), 3)
-            adapter = galleryAdapter
+            adapter       = galleryAdapter
         }
+    }
+
+    private fun checkPermissionAndLoad() {
+        permissionManager.requestGallery(onGranted = { loadGalleryImages() })
     }
 
     private fun loadGalleryImages() {
         val context = requireContext().applicationContext
-
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                val images = withContext(Dispatchers.IO) {
-                    fetchGalleryImages(context)
-                }
+                val images = withContext(Dispatchers.IO) { fetchGalleryImages(context) }
                 if (_binding == null) return@launch
-
                 if (images.isNotEmpty()) {
-                    selectedUri = images.first()
+                    selectedUri               = images.first()
                     binding.tvNext.visibility = View.VISIBLE
                     Glide.with(this@SelectImageFragment)
-                        .load(images.first())
-                        .centerCrop()
-                        .into(binding.ivPreview)
+                        .load(images.first()).centerCrop().into(binding.ivPreview)
                 }
-
                 galleryAdapter.submitList(images)
-
             } catch (e: Exception) {
                 if (_binding == null) return@launch
-                Toast.makeText(context, "Failed to load images", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(),
+                    "Failed to load images", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
     private fun fetchGalleryImages(context: Context): List<Uri> {
-        val images = mutableListOf<Uri>()
-
+        val images     = mutableListOf<Uri>()
         val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
             MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
         else
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-
         val projection = arrayOf(MediaStore.Images.Media._ID)
-        val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
-
+        val sortOrder  = "${MediaStore.Images.Media.DATE_ADDED} DESC"
         context.contentResolver.query(
             collection, projection, null, null, sortOrder
         )?.use { cursor ->
-            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+            val col = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             while (cursor.moveToNext()) {
-                val id = cursor.getLong(idColumn)
-                val uri = ContentUris.withAppendedId(
-                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id
-                )
-                images.add(uri)
+                images.add(ContentUris.withAppendedId(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    cursor.getLong(col)
+                ))
             }
         }
         return images
@@ -175,18 +188,16 @@ class SelectImageFragment : Fragment() {
 
     private fun openCamera() {
         try {
-            val imageFile = File(
-                requireContext().cacheDir,
-                "camera_${System.currentTimeMillis()}.jpg"
-            )
+            val file = File(requireContext().cacheDir,
+                "camera_${System.currentTimeMillis()}.jpg")
             cameraImageUri = FileProvider.getUriForFile(
                 requireContext(),
-                "${requireContext().packageName}.provider",
-                imageFile
+                "${requireContext().packageName}.provider", file
             )
             cameraLauncher.launch(cameraImageUri)
         } catch (e: Exception) {
-            Toast.makeText(requireContext(), "Could not open camera", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(),
+                "Could not open camera", Toast.LENGTH_SHORT).show()
         }
     }
 

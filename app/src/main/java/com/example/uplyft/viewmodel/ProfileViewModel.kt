@@ -26,92 +26,216 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.tasks.await
-
+import com.example.uplyft.data.remote.firebase.FollowFirebaseSource
+import com.google.firebase.auth.FirebaseAuth
+import com.example.uplyft.utils.UserProfileState
+import com.example.uplyft.data.local.entity.FollowEntity
 
 
 class ProfileViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db             = AppDatabase.getInstance(application)
-    private val firebaseSource = PostFirebaseSource()
-    private val cloudinary     = CloudinaryService(application.applicationContext)
+    private val followSource   = FollowFirebaseSource()
+    private val cloudinary     by lazy { CloudinaryService(application.applicationContext) }
 
-    private val repository = PostRepository(
-        postDao           = db.postDao(),
-        firebaseSource    = firebaseSource,
-        cloudinaryService = cloudinary
-    )
+    private val repository by lazy {
+        PostRepository(
+            postDao           = db.postDao(),
+            firebaseSource    = PostFirebaseSource(),
+            cloudinaryService = cloudinary
+        )
+    }
 
-    private val _profileState = MutableStateFlow<Resource<User>?>(null)
-    val profileState: StateFlow<Resource<User>?> = _profileState
+    private val _profileState = MutableStateFlow<Resource<UserProfileState>?>(null)
+    val profileState: StateFlow<Resource<UserProfileState>?> = _profileState
 
     private val _updateState = MutableStateFlow<Resource<String>?>(null)
     val updateState: StateFlow<Resource<String>?> = _updateState
 
-    // Load user profile from Firestore + Room cache
     fun loadProfile(uid: String) {
         viewModelScope.launch {
-            _profileState.value = Resource.Loading
-            try {
-                // Try Room cache first
-                val cached = withContext(Dispatchers.IO) {
-                    db.userDao().getUserById(uid)?.toDomain()
-                }
-                if (cached != null) _profileState.value = Resource.Success(cached)
+            val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+            val isOwn      = currentUid == uid
 
-                // Then fetch fresh from Firestore
-                val fresh = withContext(Dispatchers.IO) {
+            _profileState.value = null
+            val cachedUser = withContext(Dispatchers.IO) {
+                db.userDao().getUserById(uid)?.toDomain()
+            }
+
+            val cachedIsFollowing = withContext(Dispatchers.IO) {
+                if (isOwn) false
+                else {
+                    val id = "${currentUid}_${uid}"
+                    db.followDao().isFollowing(id) ?: false
+                }
+            }
+            val cachedIsFollowingBack = withContext(Dispatchers.IO) {
+                if (isOwn) false
+                else db.followDao().isFollowing("${uid}_${currentUid}") ?: false
+            }
+
+            if (cachedUser != null) {
+                _profileState.value = Resource.Success(
+                    UserProfileState(
+                        user        = cachedUser,
+                        isFollowing = cachedIsFollowing,
+                        isFollowingBack = cachedIsFollowingBack,
+                        isOwnProfile = isOwn
+                    )
+                )
+            } else {
+                _profileState.value = Resource.Loading
+            }
+
+            // ─── Step 2: Fetch fresh from Firestore in background ─────
+            try {
+                val userDoc = withContext(Dispatchers.IO) {
                     FirebaseFirestore.getInstance()
                         .collection(USERS_COLLECTION)
                         .document(uid)
                         .get()
                         .await()
-                        .toObject(User::class.java)
-                        ?.copy(uid = uid)
                 }
-                if (fresh != null) {
-                    // Update Room cache
-                    withContext(Dispatchers.IO) {
-                        db.userDao().insertUser(fresh.toEntity())
+                val freshUser = userDoc.toObject(User::class.java)
+                    ?.copy(uid = uid) ?: return@launch
+
+                val followersCount  = withContext(Dispatchers.IO) {
+                    followSource.getFollowersCount(uid)
+                }
+                val followingCount  = withContext(Dispatchers.IO) {
+                    followSource.getFollowingCount(uid)
+                }
+                val freshIsFollowing = withContext(Dispatchers.IO) {
+                    if (isOwn) false
+                    else followSource.isFollowing(currentUid, uid)
+                }
+                val freshIsFollowingBack = withContext(Dispatchers.IO) {
+                    if (isOwn) false
+                    else followSource.isFollowing(uid, currentUid)
+                }
+                val posts = withContext(Dispatchers.IO) {
+                    PostFirebaseSource().fetchUserPosts(uid)
+                }
+
+                // Update Room cache
+                withContext(Dispatchers.IO) {
+                    db.userDao().insertUser(freshUser.toEntity())
+                    // ✅ sync follow state to Room
+                    if (!isOwn) {
+                        val followId     = "${currentUid}_${uid}"
+                        val followBackId = "${uid}_${currentUid}"   // ← declare here
+
+                        if (freshIsFollowing) {
+                            db.followDao().insertFollow(
+                                FollowEntity(id = followId,
+                                    followerId  = currentUid,
+                                    followingId = uid)
+                            )
+                        } else {
+                            db.followDao().deleteFollow(followId)
+                        }
+
+                        if (freshIsFollowingBack) {
+                            db.followDao().insertFollow(
+                                FollowEntity(id = followBackId,
+                                    followerId  = uid,
+                                    followingId = currentUid)
+                            )
+                        } else {
+                            db.followDao().deleteFollow(followBackId)
+                        }
                     }
-                    _profileState.value = Resource.Success(fresh)
                 }
+
+                // Emit fresh complete state
+                _profileState.value = Resource.Success(
+                    UserProfileState(
+                        user           = freshUser,
+                        posts          = posts,
+                        followersCount = followersCount,
+                        followingCount = followingCount,
+                        isFollowing    = freshIsFollowing,
+                        isFollowingBack = freshIsFollowingBack,
+                        isOwnProfile   = isOwn
+                    )
+                )
             } catch (e: Exception) {
                 if (_profileState.value !is Resource.Success) {
-                    _profileState.value = Resource.Error(e.message ?: "Failed to load profile")
+                    _profileState.value = Resource.Error(
+                        e.message ?: "Failed to load profile"
+                    )
                 }
             }
         }
     }
 
-    // Upload new profile image to Cloudinary then update Firestore
+    fun toggleFollow(targetUserId: String) {
+        val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+
+        viewModelScope.launch {
+            try {
+                val currentState = (_profileState.value as? Resource.Success)?.data
+                    ?: return@launch
+                val isCurrentlyFollowing = currentState.isFollowing
+                val followId = "${currentUid}_${targetUserId}"
+
+                withContext(Dispatchers.IO) {
+                    if (isCurrentlyFollowing) {
+                        followSource.unfollowUser(currentUid, targetUserId)
+                        db.followDao().deleteFollow(followId)
+                    } else {
+                        followSource.followUser(currentUid, targetUserId)
+                        db.followDao().insertFollow(
+                            FollowEntity(
+                                id          = followId,
+                                followerId  = currentUid,
+                                followingId = targetUserId
+                            )
+                        )
+                    }
+                }
+
+                val newCount = if (isCurrentlyFollowing)
+                    currentState.followersCount - 1
+                else
+                    currentState.followersCount + 1
+
+                _profileState.value = Resource.Success(
+                    currentState.copy(
+                        isFollowing    = !isCurrentlyFollowing,
+                        followersCount = newCount.coerceAtLeast(0)
+                    )
+                )
+            } catch (e: Exception) {
+                // silently fail
+            }
+        }
+    }
+
     fun updateProfileImage(imageUri: Uri, uid: String) {
         viewModelScope.launch {
             _updateState.value = Resource.Loading
             try {
-                // Upload to Cloudinary
                 val imageUrl = withContext(Dispatchers.IO) {
                     cloudinary.uploadImage(imageUri)
                 }
-                // Update Firestore
                 withContext(Dispatchers.IO) {
                     FirebaseFirestore.getInstance()
                         .collection(USERS_COLLECTION)
                         .document(uid)
                         .update("profileImageUrl", imageUrl)
                         .await()
-                }
-                // Update Room cache
-                withContext(Dispatchers.IO) {
                     db.userDao().updateProfileImage(uid, imageUrl)
                 }
                 _updateState.value = Resource.Success(imageUrl)
+                // Reload profile to reflect new image
+                loadProfile(uid)
             } catch (e: Exception) {
                 _updateState.value = Resource.Error(e.message ?: "Failed to update photo")
             }
         }
     }
 
-    // Get user posts from Room Flow
     fun getUserPosts(userId: String): Flow<List<Post>> {
         return repository.observeUserPosts(userId)
     }

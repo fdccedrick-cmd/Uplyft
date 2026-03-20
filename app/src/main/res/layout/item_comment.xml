@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Instagram-style Comment Item Layout with ConstraintLayout for proper alignment -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingVertical="8dp">
+
+    <!-- Main comment row using ConstraintLayout for Instagram-style alignment -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp">
+
+        <!-- User Avatar -->
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/ivUserAvatar"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/app_logo"
+            app:shapeAppearanceOverlay="@style/circleImageView"
+            app:strokeWidth="0.5dp"
+            app:strokeColor="#DBDBDB"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"/>
+
+        <!-- Like button - FIXED at right edge -->
+        <LinearLayout
+            android:id="@+id/layoutLike"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:padding="4dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <ImageView
+                android:id="@+id/ivLikeComment"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:src="@drawable/ic_heart_outline"
+                android:tint="#999999"
+                android:contentDescription="Like comment"/>
+
+            <TextView
+                android:id="@+id/tvCommentLikeCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="11sp"
+                android:textColor="#666666"
+                android:layout_marginTop="3dp"
+                android:visibility="gone"
+                android:textStyle="bold"/>
+
+        </LinearLayout>
+
+        <!-- Content Area - Between avatar and like button -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="8dp"
+            app:layout_constraintStart_toEndOf="@id/ivUserAvatar"
+            app:layout_constraintEnd_toStartOf="@id/layoutLike"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <!-- Username + Timestamp Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/tvUsername"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/on_background"/>
+
+                <TextView
+                    android:id="@+id/tvTime"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="11sp"
+                    android:textColor="#AAAAAA"
+                    android:layout_marginStart="8dp"/>
+
+            </LinearLayout>
+
+            <!-- Comment Text -->
+            <TextView
+                android:id="@+id/tvCommentText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="@color/on_background"
+                android:lineSpacingExtra="2dp"
+                android:layout_marginTop="4dp"/>
+
+            <!-- GIF -->
+            <ImageView
+                android:id="@+id/ivGif"
+                android:layout_width="200dp"
+                android:layout_height="120dp"
+                android:scaleType="centerCrop"
+                android:layout_marginTop="6dp"
+                android:background="@color/surface"
+                android:visibility="gone"/>
+
+            <!-- Reply + Likes Row -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="4dp">
+
+                <TextView
+                    android:id="@+id/tvReply"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Reply"
+                    android:textSize="11sp"
+                    android:textColor="#AAAAAA"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:id="@+id/tvLikesCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="11sp"
+                    android:textColor="#AAAAAA"
+                    android:layout_marginStart="12dp"
+                    android:visibility="gone"/>
+
+            </LinearLayout>
+
+            <!-- View replies -->
+            <LinearLayout
+                android:id="@+id/layoutViewReplies"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="8dp"
+                android:visibility="gone">
+
+                <View
+                    android:layout_width="24dp"
+                    android:layout_height="1dp"
+                    android:background="#AAAAAA"
+                    android:layout_marginEnd="8dp"/>
+
+                <TextView
+                    android:id="@+id/tvViewReplies"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="View replies (0)"
+                    android:textSize="12sp"
+                    android:textColor="#AAAAAA"
+                    android:textStyle="bold"/>
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- Replies container — shown when expanded, outside ConstraintLayout -->
+    <LinearLayout
+        android:id="@+id/layoutReplies"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="8dp"
+        android:visibility="gone"/>
+
+</LinearLayout>

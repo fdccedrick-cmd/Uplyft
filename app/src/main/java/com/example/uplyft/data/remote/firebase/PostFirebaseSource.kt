@@ -4,6 +4,7 @@ import com.example.uplyft.domain.model.Post
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.example.uplyft.utils.Constants.POSTS_COLLECTION
+import com.example.uplyft.utils.Constants.USERS_COLLECTION
 import kotlinx.coroutines.tasks.await
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
@@ -31,11 +32,26 @@ class PostFirebaseSource {
             .get()
             .await()
 
-        // Save last doc for next page
         lastVisible = snapshot.documents.lastOrNull()
 
         return snapshot.documents.mapNotNull { doc ->
-            doc.toObject(Post::class.java)?.copy(postId = doc.id)
+            val post = doc.toObject(Post::class.java)?.copy(postId = doc.id) ?: return@mapNotNull null
+
+            // Fetch user data for each post
+            val userDoc = db.collection(USERS_COLLECTION)
+                .document(post.userId)
+                .get()
+                .await()
+
+            val fullName = userDoc.getString("fullName") ?: ""
+            val username = userDoc.getString("username") ?: ""
+            val profileImageUrl = userDoc.getString("profileImageUrl") ?: ""
+
+            post.copy(
+                // fallback to fullName if username is empty
+                username     = username.ifEmpty { fullName },
+                userImageUrl = profileImageUrl
+            )
         }
     }
 
@@ -57,7 +73,17 @@ class PostFirebaseSource {
         }
     }
 
-    // ✅ Fix — toggleLike uses Firestore transaction
+    suspend fun fetchUserPosts(userId: String): List<Post> {
+        return db.collection(POSTS_COLLECTION)
+            .whereEqualTo("userId", userId)
+            .get()
+            .await()
+            .documents
+            .mapNotNull { doc ->
+                doc.toObject(Post::class.java)?.copy(postId = doc.id)
+            }
+            .sortedByDescending { it.createdAt }   // ← sort after fetch
+    }
     suspend fun toggleLike(postId: String, userId: String): Boolean {
         val likeRef = db.collection(POSTS_COLLECTION)
             .document(postId)

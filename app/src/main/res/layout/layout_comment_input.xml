@@ -1,0 +1,103 @@
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/commentInputBar"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/background">
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.5dp"
+        android:background="@color/divider"/>
+
+    <!-- Reply indicator -->
+    <LinearLayout
+        android:id="@+id/layoutReplyIndicator"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="6dp"
+        android:background="@color/surface"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tvReplyingTo"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="12sp"
+            android:textColor="#757575"/>
+
+        <ImageView
+            android:id="@+id/ivCancelReply"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:src="@drawable/ic_close"
+            app:tint="#AAAAAA"
+            android:contentDescription="Cancel"/>
+
+    </LinearLayout>
+
+    <!-- Input row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="12dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/ivCurrentUserAvatar"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/app_logo"
+            app:shapeAppearanceOverlay="@style/circleImageView"
+            app:strokeWidth="0.5dp"
+            app:strokeColor="#DBDBDB"/>
+
+        <EditText
+            android:id="@+id/etComment"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/bg_input_field"
+            android:hint="Add a comment..."
+            android:textSize="14sp"
+            android:textColor="@color/on_background"
+            android:textColorHint="#AAAAAA"
+            android:inputType="textMultiLine|textCapSentences"
+            android:maxLines="4"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp"
+            android:layout_marginHorizontal="8dp"/>
+
+        <TextView
+            android:id="@+id/tvPost"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Post"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="#0095F6"
+            android:padding="8dp"
+            android:enabled="false"
+            android:alpha="0.4"/>
+
+    </LinearLayout>
+
+    <!-- ✅ spacer that fills nav bar height — same background color -->
+    <!-- this covers the dirty gap under the input -->
+    <View
+        android:id="@+id/navBarSpacer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:background="@color/background"/>
+
+</LinearLayout>

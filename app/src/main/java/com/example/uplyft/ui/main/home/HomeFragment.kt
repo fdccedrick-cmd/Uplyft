@@ -26,7 +26,11 @@ import com.example.uplyft.ui.adapter.PostAdapter
 import com.example.uplyft.viewmodel.FeedState
 import com.example.uplyft.viewmodel.PostViewModel
 import android.content.Intent
+import android.graphics.Color
 import android.widget.Toast
+import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.firebase.auth.FirebaseAuth
+import com.example.uplyft.ui.main.comments.CommentsBottomSheet
 
 class HomeFragment : Fragment() {
 
@@ -46,22 +50,52 @@ class HomeFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        parentFragmentManager.setFragmentResultListener(
+            "navigate_to_profile",
+            viewLifecycleOwner
+        ) { _, bundle ->
+            val userId = bundle.getString("userId") ?: return@setFragmentResultListener
+            val b = Bundle().apply { putString("userId", userId) }
+            findNavController().navigate(
+                R.id.action_homeFragment_to_userProfileFragment, b
+            )
+        }
         setupRecyclerView()
         setupClickListeners()
         observeFeedState()
         observePosts()
+        setupSwipeRefresh()
+    }
+    private fun setupSwipeRefresh() {
+        binding.swipeRefresh.apply {
+            // match your app accent color
+            setColorSchemeColors(Color.BLACK)
+            setOnRefreshListener {
+                postViewModel.loadFeed()
+            }
+        }
     }
 
     private fun setupRecyclerView() {
         postAdapter = PostAdapter(
             onLikeClick    = { post -> postViewModel.toggleLike(post) },
             onCommentClick = { post ->
-                // navigate to comments
-                // findNavController().navigate(...)
+                CommentsBottomSheet.newInstance(post.postId)
+                    .show(parentFragmentManager, CommentsBottomSheet.TAG)
             },
             onShareClick   = { post -> sharePost(post) },
             onProfileClick = { post ->
-                // navigate to user profile
+                val currentUid = FirebaseAuth.getInstance().currentUser?.uid
+                if (post.userId == currentUid) {
+                    requireActivity()
+                        .findViewById<BottomNavigationView>(R.id.bottomNavigationView)
+                        .selectedItemId = R.id.profileFragment
+                } else {
+                    val bundle = Bundle().apply { putString("userId", post.userId) }
+                    findNavController().navigate(
+                        R.id.action_homeFragment_to_userProfileFragment, bundle
+                    )
+                }
             }
         )
 
@@ -110,21 +144,27 @@ class HomeFragment : Fragment() {
                     if(_binding == null) return@collect
                     when (state) {
                         is FeedState.Loading -> {
-                            binding.shimmerLayout.visibility = View.VISIBLE
-                            binding.shimmerLayout.startShimmer()
-                            binding.rvFeed.visibility = View.GONE
+                            // only show shimmer on first load
+                            // swipeRefresh spinner shows on pull-to-refresh
+                            if (!binding.swipeRefresh.isRefreshing) {
+                                binding.shimmerLayout.visibility = View.VISIBLE
+                                binding.shimmerLayout.startShimmer()
+                                binding.rvFeed.visibility = View.GONE
+                            }
                         }
                         is FeedState.Success -> {
                             binding.shimmerLayout.stopShimmer()
                             binding.shimmerLayout.visibility = View.GONE
-                            binding.rvFeed.visibility = View.VISIBLE
+                            binding.rvFeed.visibility        = View.VISIBLE
+                            binding.swipeRefresh.isRefreshing = false  // ← stop spinner
                         }
                         is FeedState.Error -> {
                             binding.shimmerLayout.stopShimmer()
-                            binding.shimmerLayout.visibility = View.GONE
-                            binding.rvFeed.visibility = View.VISIBLE
-                            Toast.makeText(requireContext(), state.message,
-                                Toast.LENGTH_SHORT).show()
+                            binding.shimmerLayout.visibility  = View.GONE
+                            binding.rvFeed.visibility         = View.VISIBLE
+                            binding.swipeRefresh.isRefreshing = false  // ← stop spinner
+                            Toast.makeText(requireContext(),
+                                state.message, Toast.LENGTH_SHORT).show()
                         }
                     }
                 }

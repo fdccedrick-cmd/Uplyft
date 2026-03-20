@@ -1,6 +1,7 @@
 package com.example.uplyft.ui.main
 
 import android.os.Bundle
+import android.view.View
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -26,24 +27,24 @@ class MainActivity : AppCompatActivity() {
         val navHostFragment = supportFragmentManager
             .findFragmentById(R.id.navHostFragment) as NavHostFragment
         val navController = navHostFragment.navController
-        binding.bottomNavigationView.setupWithNavController(navController)
-        binding.bottomNavigationView.setOnItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.homeFragment -> {
-                    navController.navigate(R.id.homeFragment)
-                    true
-                }
-                R.id.searchFragment -> {
-                    navController.navigate(R.id.searchFragment)
-                    true
-                }
-                R.id.profileFragment -> {
-                    navController.navigate(R.id.profileFragment)
-                    true
-                }
-                else -> false
-            }
 
+        binding.bottomNavigationView.setupWithNavController(navController)
+        binding.bottomNavigationView.setOnItemReselectedListener { /* no-op */ }
+
+        val mainFragments = setOf(
+            R.id.homeFragment,
+            R.id.searchFragment,
+            R.id.profileFragment
+        )
+
+        navController.addOnDestinationChangedListener { _, destination, _ ->
+            if (destination.id in mainFragments) {
+                binding.bottomNavigationView.visibility = View.VISIBLE
+                binding.divider.visibility              = View.VISIBLE
+            } else {
+                binding.bottomNavigationView.visibility = View.GONE
+                binding.divider.visibility              = View.GONE
+            }
         }
     }
 }

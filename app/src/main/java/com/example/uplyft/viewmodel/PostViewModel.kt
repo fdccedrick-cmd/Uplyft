@@ -93,6 +93,9 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
     }
+    fun getUserPosts(userId: String): Flow<List<Post>> {
+        return repository.observeUserPosts(userId)
+    }
 }
 
 // Feed state

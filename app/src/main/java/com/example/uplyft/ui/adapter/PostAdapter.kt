@@ -87,11 +87,15 @@ class PostAdapter(
         private var isLiked = false
 
         fun bind(post: Post) {
+
+            binding.tvUsername.text= post.username.ifEmpty { "User" }
             // Profile image
             Glide.with(binding.root)
-                .load(post.userImageUrl)
+                .load(post.userImageUrl.ifEmpty { null })   // null triggers placeholder
                 .placeholder(R.drawable.ic_profile)
+                .error(R.drawable.ic_profile)
                 .circleCrop()
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
                 .into(binding.ivUserAvatar)
 
             // Post image — with caching
@@ -106,29 +110,44 @@ class PostAdapter(
             binding.tvLikesCount.text = formatLikes(post.likesCount)
             binding.tvTimestamp.text  = getRelativeTime(post.createdAt)
 
-            // Caption with bold username prefix
-            val caption = SpannableString("${post.username} ${post.caption}")
-            caption.setSpan(
-                StyleSpan(Typeface.BOLD), 0, post.username.length,
-                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-            )
-            binding.tvCaption.text = caption
+            binding.tvCommentsCount.text = when (post.commentsCount) {
+                0    -> "No comments yet"
+                1    -> "View 1 comment"
+                else -> "View all ${post.commentsCount} comments"
+            }
+            binding.tvCommentsCount.setOnClickListener {
+                onCommentClick(post)
+            }
+
+            if (post.caption.isNotEmpty()) {
+                val displayName = post.username.ifEmpty { "User" }
+                val full = SpannableString("$displayName ${post.caption}")
+                full.setSpan(
+                    StyleSpan(Typeface.BOLD),
+                    0, displayName.length,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                binding.tvCaption.text       = full
+                binding.tvCaption.visibility = View.VISIBLE
+            } else {
+                binding.tvCaption.visibility = View.GONE
+            }
 
             bindLike(post)
 
-            // Click listeners
+            // Clicks
             binding.ivLike.setOnClickListener {
                 isLiked = !isLiked
                 animateLike(binding.ivLike, isLiked)
                 onLikeClick(post)
             }
 
-            binding.ivComment.setOnClickListener  { onCommentClick(post) }
-            binding.ivShare.setOnClickListener    { onShareClick(post) }
+            binding.ivComment.setOnClickListener    { onCommentClick(post) }
+            binding.ivShare.setOnClickListener      { onShareClick(post) }
             binding.ivUserAvatar.setOnClickListener { onProfileClick(post) }
             binding.tvUsername.setOnClickListener   { onProfileClick(post) }
 
-            // Double-tap to like
+            // Double tap to like
             binding.ivPostImage.setOnClickListener(object : View.OnClickListener {
                 private var lastClick = 0L
                 override fun onClick(v: View) {

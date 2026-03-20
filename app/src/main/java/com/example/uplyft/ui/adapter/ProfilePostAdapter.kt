@@ -12,7 +12,7 @@ import com.example.uplyft.R
 import com.example.uplyft.databinding.ItemProfilePostBinding
 import com.example.uplyft.domain.model.Post
 class ProfilePostAdapter(
-    private val onPostClick: (Post) -> Unit
+    private val onPostClick: (Post) -> Unit,
 ) : RecyclerView.Adapter<ProfilePostAdapter.ProfilePostViewHolder>() {
 
     private val posts = mutableListOf<Post>()
@@ -51,14 +51,19 @@ class ProfilePostAdapter(
         fun bind(post: Post) {
             Glide.with(binding.root)
                 .load(post.imageUrl)
-                .centerCrop()
-                .diskCacheStrategy(DiskCacheStrategy.ALL)
                 .placeholder(ColorDrawable(
                     ContextCompat.getColor(binding.root.context, R.color.surface)
                 ))
+                .centerCrop()
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .dontAnimate()
                 .into(binding.ivProfilePost)
 
-            binding.root.setOnClickListener { onPostClick(post) }
+            binding.root.setOnClickListener {
+                val position = bindingAdapterPosition
+                if (position == RecyclerView.NO_ID.toInt()) return@setOnClickListener
+                onPostClick(post)
+            }
         }
     }
 }

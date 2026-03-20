@@ -90,4 +90,10 @@ dependencies {
     // Paging 3
     implementation("androidx.paging:paging-runtime-ktx:3.3.0")
     implementation("androidx.paging:paging-common-ktx:3.3.0")
+
+    //swipe refresh
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+
+    //GIF
+    implementation("com.giphy.sdk:ui:2.3.14")
 }

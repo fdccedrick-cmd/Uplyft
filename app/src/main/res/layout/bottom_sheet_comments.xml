@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/bg_rounded_top_sheet">
+
+    <!-- Drag handle -->
+    <View
+        android:id="@+id/dragHandle"
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/bg_drag_handle"/>
+
+    <!-- Header -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:gravity="center"
+        android:text="Comments"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:textColor="@color/on_background"/>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.5dp"
+        android:background="@color/divider"/>
+
+    <!-- RecyclerView fills all space — padding set in code for input height -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <com.example.uplyft.ui.widget.LockedRecyclerView
+            android:id="@+id/rvComments"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:overScrollMode="never"
+            android:clipToPadding="false"/>
+
+        <!-- Empty state -->
+        <LinearLayout
+            android:id="@+id/layoutEmptyState"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="No comments yet"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/on_background"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Start the conversation"
+                android:textSize="13sp"
+                android:textColor="#AAAAAA"
+                android:layout_marginTop="4dp"/>
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+    <!-- ❌ NO input here — layout_comment_input added via windowDecor in code -->
+
+</LinearLayout>

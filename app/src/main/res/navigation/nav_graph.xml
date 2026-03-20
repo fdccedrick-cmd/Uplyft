@@ -4,28 +4,20 @@
     android:id="@+id/nav_graph"
     app:startDestination="@id/homeFragment">
 
-    <fragment
-        android:id="@+id/homeFragment"
-        android:name="com.example.uplyft.ui.main.home.HomeFragment"
-        android:label="Home" />
+    <!-- ═══════════════════════════════════════════
+         DECLARE CHILD FRAGMENTS FIRST
+         so actions can reference their IDs
+    ═══════════════════════════════════════════ -->
 
     <fragment
-        android:id="@+id/searchFragment"
-        android:name="com.example.uplyft.ui.main.search.SearchFragment"
-        android:label="Search" />
-
-    <fragment
-        android:id="@+id/profileFragment"
-        android:name="com.example.uplyft.ui.main.profile.ProfileFragment"
-        android:label="Profile">
-        <action
-            android:id="@+id/action_profileFragment_to_editProfileFragment"
-            app:destination="@id/editProfileFragment"/>
-    </fragment>
+        android:id="@+id/editProfileFragment"
+        android:name="com.example.uplyft.ui.main.profile.EditProfileFragment"
+        android:label="Edit Profile"/>
 
     <fragment
         android:id="@+id/selectImageFragment"
-        android:name="com.example.uplyft.ui.main.createpost.SelectImageFragment">
+        android:name="com.example.uplyft.ui.main.createpost.SelectImageFragment"
+        android:label="New Post">
         <action
             android:id="@+id/action_selectImageFragment_to_createPostFragment"
             app:destination="@id/createPostFragment"/>
@@ -33,15 +25,77 @@
 
     <fragment
         android:id="@+id/createPostFragment"
-        android:name="com.example.uplyft.ui.main.createpost.CreatePostFragment">
+        android:name="com.example.uplyft.ui.main.createpost.CreatePostFragment"
+        android:label="New Post">
         <argument
             android:name="imageUri"
             app:argType="string"/>
     </fragment>
 
     <fragment
-        android:id="@+id/editProfileFragment"
-        android:name="com.example.uplyft.ui.main.profile.EditProfileFragment"
-        android:label="Edit Profile"/>
+        android:id="@+id/postDetailFragment"
+        android:name="com.example.uplyft.ui.main.profile.PostDetailFragment"
+        android:label="Posts">
+        <argument
+            android:name="postId"
+            app:argType="string"/>
+        <argument
+            android:name="userId"
+            app:argType="string"/>
+        <action
+            android:id="@+id/action_postDetailFragment_to_userProfileFragment"
+            app:destination="@id/userProfileFragment"/>
+    </fragment>
+
+    <fragment
+        android:id="@+id/userProfileFragment"
+        android:name="com.example.uplyft.ui.main.profile.UserProfileFragment"
+        android:label="Profile">
+        <argument
+            android:name="userId"
+            app:argType="string"/>
+        <action
+            android:id="@+id/action_userProfileFragment_to_postDetailFragment"
+            app:destination="@id/postDetailFragment"/>
+    </fragment>
+
+    <!-- ═══════════════════════════════════════════
+         MAIN TAB FRAGMENTS — bottom nav visible
+    ═══════════════════════════════════════════ -->
+
+    <fragment
+        android:id="@+id/homeFragment"
+        android:name="com.example.uplyft.ui.main.home.HomeFragment"
+        android:label="Home">
+        <action
+            android:id="@+id/action_homeFragment_to_selectImageFragment"
+            app:destination="@id/selectImageFragment"/>
+        <action
+            android:id="@+id/action_homeFragment_to_userProfileFragment"
+            app:destination="@id/userProfileFragment"/>
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/searchFragment"
+        android:name="com.example.uplyft.ui.main.search.SearchFragment"
+        android:label="Search"/>
+
+    <fragment
+        android:id="@+id/profileFragment"
+        android:name="com.example.uplyft.ui.main.profile.ProfileFragment"
+        android:label="Profile">
+        <argument
+            android:name="userId"
+            app:argType="string"
+            android:defaultValue="@null"
+            app:nullable="true"/>
+        <action
+            android:id="@+id/action_profileFragment_to_editProfileFragment"
+            app:destination="@id/editProfileFragment"/>
+        <action
+            android:id="@+id/action_profileFragment_to_postDetailFragment"
+            app:destination="@id/postDetailFragment"/>
+    </fragment>
 
 </navigation>

@@ -5,8 +5,10 @@ data class Post(
     val userId      : String = "",
     val username    : String = "",       // ← add
     val userImageUrl: String = "",       // ← add
-    val imageUrl    : String = "",
+    val imageUrl     : String       = "",   // first image (backward compat)
+    val imageUrls    : List<String> = emptyList(), // ✅ all images
     val caption     : String = "",
+    val commentsCount: Int    = 0,
     val likesCount  : Int    = 0,
     val isLiked     : Boolean = false,   // ← add
     val createdAt   : Long   = System.currentTimeMillis()

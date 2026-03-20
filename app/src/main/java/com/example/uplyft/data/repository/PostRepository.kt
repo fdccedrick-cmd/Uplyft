@@ -10,9 +10,12 @@ import android.net.Uri
 import com.example.uplyft.data.local.entity.PostEntity
 import com.example.uplyft.data.local.entity.toDomain
 import com.example.uplyft.data.local.entity.toEntity
+import com.example.uplyft.utils.Constants.USERS_COLLECTION
 import java.util.UUID
 import com.example.uplyft.utils.PostUploadState
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 
 
 // data/repository/PostRepository.kt
@@ -68,18 +71,32 @@ class PostRepository(
     }
 
     suspend fun createPost(
-        imageUri: Uri,
-        caption: String,
-        userId: String,
+        imageUri  : Uri,
+        caption   : String,
+        userId    : String,
         onProgress: (PostUploadState) -> Unit
     ) {
         val tempPostId = UUID.randomUUID().toString()
+        val userDoc = FirebaseFirestore.getInstance()
+            .collection(USERS_COLLECTION)
+            .document(userId)
+            .get()
+            .await()
+
+        val fullName = userDoc.getString("fullName") ?: ""
+        val username = userDoc.getString("username").let {
+            if (it.isNullOrEmpty()) fullName else it
+        }
+        val userImageUrl = userDoc.getString("profileImageUrl") ?: ""
+
         val localPost = PostEntity(
-            postId   = tempPostId,
-            userId   = userId,
-            imageUrl = imageUri.toString(),
-            caption  = caption,
-            isSynced = false
+            postId       = tempPostId,
+            userId       = userId,
+            username     = username,
+            userImageUrl = userImageUrl,
+            imageUrl     = imageUri.toString(),
+            caption      = caption,
+            isSynced     = false
         )
         postDao.insertPost(localPost)
         onProgress(PostUploadState.Saving)
@@ -90,10 +107,12 @@ class PostRepository(
 
             onProgress(PostUploadState.Syncing)
             val post = Post(
-                postId   = tempPostId,
-                userId   = userId,
-                imageUrl = cloudinaryUrl,
-                caption  = caption
+                postId       = tempPostId,
+                userId       = userId,
+                username     = username,
+                userImageUrl = userImageUrl,
+                imageUrl     = cloudinaryUrl,
+                caption      = caption
             )
             firebaseSource.savePost(post)
             postDao.updatePostUrl(tempPostId, cloudinaryUrl)

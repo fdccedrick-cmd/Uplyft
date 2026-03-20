@@ -8,6 +8,22 @@
     android:orientation="vertical"
     android:background="@color/background">
 
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvMentionSuggestions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:background="@color/background"
+        android:nestedScrollingEnabled="false"/>
+
+    <View
+        android:id="@+id/mentionDivider"
+        android:layout_width="match_parent"
+        android:layout_height="0.5dp"
+        android:background="@color/divider"
+        android:visibility="gone"/>
+
+
     <View
         android:layout_width="match_parent"
         android:layout_height="0.5dp"

@@ -31,6 +31,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.core.view.WindowInsetsAnimationCompat
+import androidx.lifecycle.ViewModelProvider
+import androidx.recyclerview.widget.RecyclerView
+import com.example.uplyft.ui.adapter.MentionAdapter
+import com.example.uplyft.viewmodel.MentionViewModel
+
 
 class CommentsBottomSheet : BottomSheetDialogFragment() {
 
@@ -50,6 +55,11 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
     private var postId         : String?  = null
     private var currentUid     : String?  = null
     private var currentUsername: String   = ""
+
+    private lateinit var mentionViewModel: MentionViewModel
+    private lateinit var mentionAdapter  : MentionAdapter
+    private var currentMentionQuery      : String = ""
+    private var isMentioning             : Boolean = false
 
     companion object {
         const val TAG = "CommentsBottomSheet"
@@ -84,6 +94,11 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
 
         recyclerView  = view.findViewById(R.id.rvComments)
         emptyState    = view.findViewById(R.id.layoutEmptyState)
+
+        mentionViewModel = ViewModelProvider(
+            this,
+            ViewModelProvider.AndroidViewModelFactory.getInstance(requireActivity().application)
+        ).get(MentionViewModel::class.java)
 
         view.post {
             setupSheet()
@@ -259,6 +274,37 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
     // ─────────────────────────────────────────────
 
     private fun setupInput() {
+
+        // ✅ setup mention suggestions RecyclerView
+        val rvMentions = inputBar.findViewById<RecyclerView>(R.id.rvMentionSuggestions)
+        val mentionDivider = inputBar.findViewById<View>(R.id.mentionDivider)
+
+        mentionAdapter = MentionAdapter { user ->
+            // ✅ insert @username into EditText
+            val text    = etComment.text.toString()
+            val cursor  = etComment.selectionStart
+            val atIndex = text.lastIndexOf('@', cursor - 1)
+            if (atIndex >= 0) {
+                val newText = text.substring(0, atIndex) +
+                        "@${user.username} " +
+                        text.substring(cursor)
+                etComment.setText(newText)
+                etComment.setSelection(atIndex + user.username.length + 2)
+            }
+            // hide suggestions
+            rvMentions.visibility      = View.GONE
+            mentionDivider.visibility  = View.GONE
+            isMentioning               = false
+            currentUid?.let { mentionViewModel.clearSuggestions() }
+        }
+
+        rvMentions.apply {
+            layoutManager = LinearLayoutManager(requireContext())
+            adapter       = mentionAdapter
+        }
+
+
+
         inputBar.findViewById<ImageView>(R.id.ivCancelReply).setOnClickListener {
             replyingTo             = null
             layoutReply.visibility = View.GONE
@@ -272,6 +318,30 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
                 val has          = !s.isNullOrBlank()
                 tvPost.isEnabled = has
                 tvPost.alpha     = if (has) 1f else 0.4f
+
+                val text   = s?.toString() ?: return
+                val cursor = (st + c).coerceAtMost(text.length)
+
+                // ✅ find last @ before cursor
+                val sub    = text.substring(0, cursor)
+                val atIdx  = sub.lastIndexOf('@')
+
+                if (atIdx >= 0) {
+                    val afterAt = sub.substring(atIdx + 1)
+                    // ✅ only trigger if no space after @ (still typing username)
+                    if (!afterAt.contains(' ')) {
+                        isMentioning        = true
+                        currentMentionQuery = afterAt
+                        currentUid?.let {
+                            mentionViewModel.searchMentions(afterAt, it)
+                        }
+                        return
+                    }
+                }
+
+                // hide suggestions
+                isMentioning = false
+                mentionViewModel.clearSuggestions()
             }
         })
 
@@ -295,6 +365,9 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
             layoutReply.visibility = View.GONE
             etComment.hint         = "Add a comment..."
             etComment.text.clear()
+            rvMentions.visibility     = View.GONE
+            mentionDivider.visibility = View.GONE
+            isMentioning              = false
             hideKeyboard()
         }
     }
@@ -360,6 +433,27 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
                             Toast.makeText(requireContext(),
                                 state.message, Toast.LENGTH_SHORT).show()
                         }
+                    }
+                }
+
+                // ✅ mention suggestions observer — here it works reliably
+                launch {
+                    mentionViewModel.suggestions.collect { list ->
+                        if (!isAdded) return@collect
+                        if (!::mentionAdapter.isInitialized) return@collect
+
+                        val rvMentions     = inputBar.findViewById<RecyclerView>(
+                            R.id.rvMentionSuggestions)
+                        val mentionDivider = inputBar.findViewById<View>(
+                            R.id.mentionDivider)
+
+                        mentionAdapter.submitList(list)
+                        val show = list.isNotEmpty() && isMentioning
+                        rvMentions.visibility     = if (show) View.VISIBLE else View.GONE
+                        mentionDivider.visibility = if (show) View.VISIBLE else View.GONE
+
+                        // ✅ update recycler padding when suggestions appear/disappear
+                        if (show) updateRecyclerPadding()
                     }
                 }
             }

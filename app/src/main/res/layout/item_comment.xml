@@ -43,7 +43,7 @@
                 android:layout_width="18dp"
                 android:layout_height="18dp"
                 android:src="@drawable/ic_heart_outline"
-                android:tint="#999999"
+                app:tint="#999999"
                 android:contentDescription="Like comment"/>
 
             <TextView
@@ -83,14 +83,19 @@
                     android:textSize="13sp"
                     android:textStyle="bold"
                     android:textColor="@color/on_background"/>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=" · "
+                    android:textSize="11sp"
+                    android:textColor="#AAAAAA"/>
 
                 <TextView
                     android:id="@+id/tvTime"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textSize="11sp"
-                    android:textColor="#AAAAAA"
-                    android:layout_marginStart="8dp"/>
+                    android:textColor="#AAAAAA"/>
 
             </LinearLayout>
 
@@ -179,7 +184,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="4dp"
+        android:paddingStart="44dp"
         android:visibility="gone"/>
-
 </LinearLayout>

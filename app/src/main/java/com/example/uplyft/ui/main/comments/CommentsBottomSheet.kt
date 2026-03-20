@@ -30,6 +30,7 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.core.view.WindowInsetsAnimationCompat
 
 class CommentsBottomSheet : BottomSheetDialogFragment() {
 
@@ -61,8 +62,9 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         return (super.onCreateDialog(savedInstanceState) as BottomSheetDialog).also { dialog ->
+            // ✅ ADJUST_NOTHING — we handle keyboard manually via WindowInsetsAnimation
             dialog.window?.setSoftInputMode(
-                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
             )
         }
     }
@@ -95,7 +97,19 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
     // ─────────────────────────────────────────────
     // SHEET + INPUT
     // ─────────────────────────────────────────────
-
+    private fun updateRecyclerPadding() {
+        val navHeight = getNavBarHeight()
+        inputBar.post {
+            val inputHeight = inputBar.height
+            if (inputHeight > 0) {
+                val pad = (inputHeight - navHeight).coerceAtLeast(0)
+                if (recyclerView.paddingBottom != pad) {
+                    recyclerView.setPadding(0, 0, 0, pad)
+                    recyclerView.clipToPadding = false
+                }
+            }
+        }
+    }
     private fun setupSheet() {
         val dialog      = dialog as? BottomSheetDialog ?: return
         val sheet       = dialog.findViewById<View>(
@@ -109,15 +123,27 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
         val screenH = resources.displayMetrics.heightPixels
 
         sheetBehavior = BottomSheetBehavior.from(sheet).apply {
-            peekHeight    = (screenH * 0.65).toInt()
-            maxHeight     = screenH
-            state         = BottomSheetBehavior.STATE_COLLAPSED
-            skipCollapsed = false
-            isHideable    = true
-            isDraggable   = true
+            peekHeight        = (screenH * 0.65).toInt()
+            maxHeight         = screenH
+            state             = BottomSheetBehavior.STATE_COLLAPSED
+            skipCollapsed     = false
+            isHideable        = true
+            isDraggable       = true
+            isFitToContents   = false
+            halfExpandedRatio = 0.65f
+
+            addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
+                override fun onStateChanged(bottomSheet: View, newState: Int) {
+                    if (newState == BottomSheetBehavior.STATE_COLLAPSED ||
+                        newState == BottomSheetBehavior.STATE_EXPANDED  ||
+                        newState == BottomSheetBehavior.STATE_HALF_EXPANDED) {
+                        updateRecyclerPadding()
+                    }
+                }
+                override fun onSlide(bottomSheet: View, slideOffset: Float) {}
+            })
         }
 
-        // ✅ inflate input into dialog window — independent of sheet scroll
         inputBar = LayoutInflater.from(requireContext())
             .inflate(R.layout.layout_comment_input, windowDecor, false)
 
@@ -133,14 +159,20 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
 
         windowDecor.addView(inputBar, inputParams)
 
-        // ✅ after inputBar is drawn — set recycler padding to exact height
+        // ✅ set nav spacer immediately
+        val navHeight = getNavBarHeight()
+        inputBar.findViewById<View>(R.id.navBarSpacer).apply {
+            layoutParams.height = navHeight
+            requestLayout()
+        }
+
+        // ✅ initial padding after inputBar measured
         inputBar.viewTreeObserver.addOnGlobalLayoutListener(
             object : ViewTreeObserver.OnGlobalLayoutListener {
                 override fun onGlobalLayout() {
                     val inputHeight = inputBar.height
                     if (inputHeight > 0) {
-                        recyclerView.setPadding(0, 0, 0, inputHeight)
-                        recyclerView.clipToPadding = false
+                        updateRecyclerPadding()
                         if (::adapter.isInitialized && adapter.itemCount > 0) {
                             recyclerView.post {
                                 recyclerView.scrollToPosition(adapter.itemCount - 1)
@@ -152,46 +184,55 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
             }
         )
 
-        // ✅ keyboard insets — input slides above keyboard
-        ViewCompat.setOnApplyWindowInsetsListener(inputBar) { v, insets ->
-            val imeHeight = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
-            val navHeight = insets.getInsets(
-                WindowInsetsCompat.Type.navigationBars()
-            ).bottom
+        // ✅ keyboard detection via root view layout changes
+        val rootView = dialog.window?.decorView?.rootView ?: return
 
-            // fill gap behind nav bar
-            inputBar.findViewById<View>(R.id.navBarSpacer)?.apply {
-                layoutParams.height = navHeight
-                requestLayout()
-            }
+        ViewCompat.setWindowInsetsAnimationCallback(
+            windowDecor,
+            object : WindowInsetsAnimationCompat.Callback(DISPATCH_MODE_STOP) {
 
-            // move input above keyboard when open
-            (v.layoutParams as FrameLayout.LayoutParams).bottomMargin =
-                if (imeHeight > 0) imeHeight else 0
-            v.requestLayout()
+                override fun onProgress(
+                    insets: WindowInsetsCompat,
+                    runningAnimations: List<WindowInsetsAnimationCompat>
+                ): WindowInsetsCompat {
+                    val imeBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+                    val nav       = getNavBarHeight()
 
-            // update recycler padding when keyboard state changes
-            v.post {
-                val inputHeight = v.height
-                if (inputHeight > 0) {
-                    val pad = if (imeHeight > 0) {
-                        inputHeight - navHeight
-                    } else {
-                        inputHeight
+                    // ✅ animate input bar position in real time with keyboard
+                    (inputBar.layoutParams as FrameLayout.LayoutParams).bottomMargin =
+                        if (imeBottom > nav) imeBottom else 0
+                    inputBar.requestLayout()
+
+                    return insets
+                }
+
+                override fun onEnd(animation: WindowInsetsAnimationCompat) {
+                    super.onEnd(animation)
+                    if (!isAdded) return
+                    // ✅ update recycler padding after keyboard fully shown/hidden
+                    inputBar.post {
+                        val inputHeight = inputBar.height
+                        val nav         = getNavBarHeight()
+                        if (inputHeight > 0) {
+                            val pad = (inputHeight - nav).coerceAtLeast(0)
+                            recyclerView.setPadding(0, 0, 0, pad)
+                            recyclerView.clipToPadding = false
+                        }
                     }
-                    recyclerView.setPadding(0, 0, 0, pad)
-                    recyclerView.clipToPadding = false
                 }
             }
-
-            insets
-        }
-
-        ViewCompat.requestApplyInsets(inputBar)
+        )
 
         setupDragHandle()
         setupInput()
         loadCurrentUserAvatar()
+    }
+
+    private fun getNavBarHeight(): Int {
+        val resourceId = resources.getIdentifier(
+            "navigation_bar_height", "dimen", "android"
+        )
+        return if (resourceId > 0) resources.getDimensionPixelSize(resourceId) else 0
     }
 
     // ─────────────────────────────────────────────

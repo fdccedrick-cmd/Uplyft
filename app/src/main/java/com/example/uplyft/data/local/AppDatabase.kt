@@ -11,16 +11,19 @@ import com.example.uplyft.data.local.dao.PostDao
 import com.example.uplyft.data.local.entity.PostEntity
 import com.example.uplyft.data.local.dao.FollowDao
 import com.example.uplyft.data.local.entity.FollowEntity
+import com.example.uplyft.data.local.dao.UserStatsDao
+import com.example.uplyft.data.local.entity.UserStatsEntity
 
 @Database(
-    entities = [PostEntity::class, UserEntity::class, FollowEntity::class],
-    version = 9,
+    entities = [PostEntity::class, UserEntity::class, FollowEntity::class, UserStatsEntity::class],
+    version = 10,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun postDao(): PostDao
     abstract fun userDao(): UserDao
     abstract fun followDao(): FollowDao
+    abstract fun userStatsDao(): UserStatsDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null

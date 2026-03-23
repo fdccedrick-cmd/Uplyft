@@ -41,7 +41,6 @@ android {
         viewBinding = true
     }
 
-    // ✅ fix META-INF/DEPENDENCIES conflict
     packaging {
         resources {
             excludes += "META-INF/DEPENDENCIES"

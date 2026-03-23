@@ -17,7 +17,7 @@
             android:layout_height="120dp"
             android:layout_weight="1"
             android:layout_margin="1dp"
-            android:background="@drawable/shimmer_rect"/>
+            android:background="@color/surface"/>
 
         <!-- Item 2 -->
         <View
@@ -25,7 +25,7 @@
             android:layout_height="120dp"
             android:layout_weight="1"
             android:layout_margin="1dp"
-            android:background="@drawable/shimmer_rect"/>
+            android:background="@color/surface"/>
 
         <!-- Item 3 -->
         <View
@@ -33,9 +33,11 @@
             android:layout_height="120dp"
             android:layout_weight="1"
             android:layout_margin="1dp"
-            android:background="@drawable/shimmer_rect"/>
+            android:background="@color/surface"/>
 
     </LinearLayout>
 
 </LinearLayout>
+
+
 

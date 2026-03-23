@@ -99,8 +99,8 @@ class ProfileFragment : Fragment() {
         setupPostsGrid()
         setupClickListeners()
 
-        // ✅ Start shimmer animation when fragment loads
-        binding.shimmerLoadingContainer.startShimmer()
+        // ✅ Start shimmer animation for entire profile
+        binding.profileShimmerContainer.startShimmer()
 
         loadProfile()
         observeStates()
@@ -184,11 +184,6 @@ class ProfileFragment : Fragment() {
                     if (_binding == null) return@collect
                     profilePostAdapter.submitList(posts)
                     binding.tvPostCount.text = posts.size.toString()
-
-                    // ✅ Stop shimmer and hide it when posts load
-                    binding.shimmerLoadingContainer.stopShimmer()
-                    binding.shimmerLoadingContainer.visibility = View.GONE
-                    binding.rvProfilePosts.visibility = View.VISIBLE
                 }
             }
         }
@@ -201,14 +196,29 @@ class ProfileFragment : Fragment() {
                     if (_binding == null) return@collect
                     when (state) {
                         is Resource.Loading -> {
-                            binding.progressBar.visibility = View.VISIBLE
+                            // ✅ Show shimmer during loading (for stats and posts)
+                            binding.profileShimmerContainer.visibility = View.VISIBLE
+                            binding.profileShimmerContainer.startShimmer()
+                            binding.scrollView.visibility = View.GONE
+                            binding.progressBar.visibility = View.GONE
                         }
                         is Resource.Success -> {
                             binding.progressBar.visibility = View.GONE
                             bindProfile(state.data)
+
+                            // ✅ Hide shimmer and show actual content
+                            binding.profileShimmerContainer.stopShimmer()
+                            binding.profileShimmerContainer.visibility = View.GONE
+                            binding.scrollView.visibility = View.VISIBLE
                         }
                         is Resource.Error -> {
                             binding.progressBar.visibility = View.GONE
+
+                            // ✅ Hide shimmer on error
+                            binding.profileShimmerContainer.stopShimmer()
+                            binding.profileShimmerContainer.visibility = View.GONE
+                            binding.scrollView.visibility = View.VISIBLE
+
                             Toast.makeText(requireContext(),
                                 state.message, Toast.LENGTH_SHORT).show()
                         }

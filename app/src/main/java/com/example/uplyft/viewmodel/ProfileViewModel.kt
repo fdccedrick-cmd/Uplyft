@@ -28,6 +28,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.tasks.await
 import com.example.uplyft.data.remote.firebase.FollowFirebaseSource
 import com.google.firebase.auth.FirebaseAuth
+import com.example.uplyft.data.local.entity.UserStatsEntity
 import com.example.uplyft.utils.UserProfileState
 import com.example.uplyft.data.local.entity.FollowEntity
 
@@ -56,9 +57,17 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
             val isOwn      = currentUid == uid
 
-            _profileState.value = null
+            // ─── Step 1: Load cached data ─────
             val cachedUser = withContext(Dispatchers.IO) {
                 db.userDao().getUserById(uid)?.toDomain()
+            }
+
+            val cachedStats = withContext(Dispatchers.IO) {
+                db.userStatsDao().getUserStats(uid)
+            }
+
+            val cachedPosts = withContext(Dispatchers.IO) {
+                db.postDao().getUserPosts(uid).map { it.toDomain() }
             }
 
             val cachedIsFollowing = withContext(Dispatchers.IO) {
@@ -73,16 +82,24 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 else db.followDao().isFollowing("${uid}_${currentUid}") ?: false
             }
 
-            if (cachedUser != null) {
+            // ✅ If we have cached user AND stats, show immediately (no shimmer)
+            // Posts can be empty if user hasn't posted yet
+            val hasCachedData = cachedUser != null && cachedStats != null
+
+            if (hasCachedData) {
                 _profileState.value = Resource.Success(
                     UserProfileState(
-                        user        = cachedUser,
-                        isFollowing = cachedIsFollowing,
+                        user           = cachedUser!!,
+                        posts          = cachedPosts,
+                        followersCount = cachedStats!!.followersCount,
+                        followingCount = cachedStats.followingCount,
+                        isFollowing    = cachedIsFollowing,
                         isFollowingBack = cachedIsFollowingBack,
-                        isOwnProfile = isOwn
+                        isOwnProfile   = isOwn
                     )
                 )
             } else {
+                // ✅ No cache - show shimmer
                 _profileState.value = Resource.Loading
             }
 
@@ -116,13 +133,30 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                     PostFirebaseSource().fetchUserPosts(uid, currentUserId = currentUid)
                 }
 
-                // Update Room cache
+                // ✅ Update Room cache (user, posts, stats, follow state)
                 withContext(Dispatchers.IO) {
+                    // Cache user info
                     db.userDao().insertUser(freshUser.toEntity())
-                    // ✅ sync follow state to Room
+
+                    // ✅ Cache posts
+                    posts.forEach { post ->
+                        db.postDao().insertPost(post.toEntity())
+                    }
+
+                    // ✅ Cache user stats
+                    db.userStatsDao().insertUserStats(
+                        UserStatsEntity(
+                            userId = uid,
+                            postsCount = posts.size,
+                            followersCount = followersCount,
+                            followingCount = followingCount
+                        )
+                    )
+
+                    // sync follow state to Room
                     if (!isOwn) {
                         val followId     = "${currentUid}_${uid}"
-                        val followBackId = "${uid}_${currentUid}"   // ← declare here
+                        val followBackId = "${uid}_${currentUid}"
 
                         if (freshIsFollowing) {
                             db.followDao().insertFollow(

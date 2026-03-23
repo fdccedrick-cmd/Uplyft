@@ -3,6 +3,8 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="orange">#E97D42</color>
+    <color name="primary">#E97D42</color> <!-- Primary color (orange) -->
+    <color name="primary_variant">#D16A32</color> <!-- Darker variant of primary -->
     <color name="light_background">#1E1E1E</color>
     <color name="input_background">#2C2C2C</color>
     <color name="text_gray">#B0B0B0</color>

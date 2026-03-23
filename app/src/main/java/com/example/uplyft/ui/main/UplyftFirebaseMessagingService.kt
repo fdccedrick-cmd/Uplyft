@@ -27,23 +27,12 @@ class UplyftFirebaseMessagingService : FirebaseMessagingService() {
             }
     }
 
-    override fun onMessageReceived(message: RemoteMessage) {
-        val title     = message.notification?.title
-            ?: message.data["title"] ?: return
-        val body      = message.notification?.body
-            ?: message.data["body"]  ?: return
-        val type      = message.data["type"]      ?: ""
-        val postId    = message.data["postId"]    ?: ""
-        val commentId = message.data["commentId"] ?: ""
-
-        showNotification(title, body, type, postId, commentId)
-    }
-
     private fun showNotification(
         title    : String,
         body     : String,
         type     : String,
         postId   : String,
+        fromUser : String,
         commentId: String
     ) {
         val channelId = "uplyft_notifications"
@@ -62,15 +51,17 @@ class UplyftFirebaseMessagingService : FirebaseMessagingService() {
                 .createNotificationChannel(channel)
         }
 
+        // ✅ pass all navigation data in intent
         val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra("type",      type)
             putExtra("postId",    postId)
+            putExtra("fromUserId", fromUser)
             putExtra("commentId", commentId)
         }
 
         val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
+            this, System.currentTimeMillis().toInt(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -85,5 +76,19 @@ class UplyftFirebaseMessagingService : FirebaseMessagingService() {
 
         NotificationManagerCompat.from(this)
             .notify(System.currentTimeMillis().toInt(), notification)
+    }
+
+    override fun onMessageReceived(message: RemoteMessage) {
+        val title     = message.notification?.title
+            ?: message.data["title"] ?: return
+        val body      = message.notification?.body
+            ?: message.data["body"]  ?: return
+        val type      = message.data["type"]       ?: ""
+        val postId    = message.data["postId"]     ?: ""
+        val fromUser  = message.data["fromUserId"] ?: ""
+        val commentId = message.data["commentId"]  ?: ""
+
+        // ✅ pass fromUser to showNotification
+        showNotification(title, body, type, postId, fromUser, commentId)
     }
 }

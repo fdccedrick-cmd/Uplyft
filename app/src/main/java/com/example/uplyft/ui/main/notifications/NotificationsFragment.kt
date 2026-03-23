@@ -14,7 +14,6 @@ import com.example.uplyft.ui.adapter.NotificationAdapter
 import com.example.uplyft.utils.NotificationTypes
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -23,6 +22,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import com.example.uplyft.viewmodel.NotificationViewModel
+import kotlinx.coroutines.flow.collect
 
 
 // ui/main/notifications/NotificationsFragment.kt
@@ -51,16 +51,14 @@ class NotificationsFragment : Fragment() {
 
         setupRecycler()
         setupClickListeners()
+        setupSwipeRefresh()
         observeData()
 
+        // Only start listening if not already listening
         if (!hasLoaded) {
+            viewModel.startListeningNotifications(currentUid)
             hasLoaded = true
-            viewModel.loadNotifications(currentUid)
         }
-    }
-    override fun onResume() {
-        super.onResume()
-        viewModel.markAllRead(currentUid)
     }
 
     private fun setupRecycler() {
@@ -85,16 +83,32 @@ class NotificationsFragment : Fragment() {
         }
     }
 
+    private fun setupSwipeRefresh() {
+        binding.swipeRefresh.setColorSchemeResources(
+            R.color.primary,
+            R.color.primary_variant
+        )
+        binding.swipeRefresh.setOnRefreshListener {
+            viewModel.refreshNotifications(currentUid)
+        }
+    }
+
     private fun observeData() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
 
                 launch {
                     viewModel.isLoading.collect { loading ->
+                        // Stop swipe refresh when loading is done
+                        if (!loading) {
+                            binding.swipeRefresh.isRefreshing = false
+                        }
+
+                        // Only show shimmer on initial load, not on swipe refresh
+                        val showShimmer = loading && !binding.swipeRefresh.isRefreshing
                         binding.shimmerLayout.visibility =
-                            if (loading) View.VISIBLE else View.GONE
-                        if (loading) binding.shimmerLayout
-                            .startShimmer()
+                            if (showShimmer) View.VISIBLE else View.GONE
+                        if (showShimmer) binding.shimmerLayout.startShimmer()
                         else binding.shimmerLayout.stopShimmer()
                     }
                 }
@@ -119,6 +133,9 @@ class NotificationsFragment : Fragment() {
     }
 
     private fun handleNotifClick(notif: Notification) {
+        // ✅ mark single notif as read on tap
+        viewModel.markSingleRead(notif.id, currentUid)
+
         when (notif.type) {
             NotificationTypes.LIKE_POST,
             NotificationTypes.COMMENT,
@@ -133,15 +150,18 @@ class NotificationsFragment : Fragment() {
                     )
                 }
             }
+
             NotificationTypes.FOLLOW,
             NotificationTypes.FOLLOW_BACK -> {
-                val bundle = Bundle().apply {
-                    putString("userId", notif.fromUserId)
+                if (notif.fromUserId.isNotEmpty()) {
+                    val bundle = Bundle().apply {
+                        putString("userId", notif.fromUserId)
+                    }
+                    findNavController().navigate(
+                        R.id.action_notificationsFragment_to_userProfileFragment,
+                        bundle
+                    )
                 }
-                findNavController().navigate(
-                    R.id.action_notificationsFragment_to_userProfileFragment,
-                    bundle
-                )
             }
         }
     }

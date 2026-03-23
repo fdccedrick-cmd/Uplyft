@@ -19,6 +19,7 @@ import kotlinx.coroutines.tasks.await
 import com.example.uplyft.utils.Constants.USERS_COLLECTION
 import com.example.uplyft.utils.Constants.POSTS_COLLECTION
 import com.google.firebase.firestore.FieldValue
+import com.example.uplyft.utils.NotificationSender
 
 class CommentViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -240,6 +241,22 @@ class CommentViewModel(application: Application) : AndroidViewModel(application)
                 if (newIsLiked) {
                     likeRef.set(mapOf("likedAt" to System.currentTimeMillis())).await()
                     ref.update("likesCount", FieldValue.increment(1)).await()
+
+                    // Send notification only if liking someone else's comment
+                    if (uid != comment.userId) {
+                        val currentUser = getUser(uid)
+                        if (currentUser != null) {
+                            val notificationSender = NotificationSender(getApplication())
+                            notificationSender.sendLikeCommentNotification(
+                                fromUserId = uid,
+                                fromUsername = currentUser.username.ifEmpty { currentUser.fullName },
+                                fromImage = currentUser.profileImageUrl ?: "",
+                                toUserId = comment.userId,
+                                postId = comment.postId,
+                                commentId = comment.commentId
+                            )
+                        }
+                    }
                 } else {
                     likeRef.delete().await()
                     ref.update("likesCount", FieldValue.increment(-1)).await()

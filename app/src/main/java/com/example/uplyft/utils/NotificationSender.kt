@@ -108,7 +108,8 @@ class NotificationSender(private val context: Context) {
         )
         push(toUserId, fromUsername, "commented: $preview",
             mapOf("type"   to NotificationTypes.COMMENT,
-                "postId" to postId))
+                "postId" to postId,
+                "fromUserId" to fromUserId ))
     }
 
 
@@ -137,7 +138,8 @@ class NotificationSender(private val context: Context) {
         push(toUserId, fromUsername, "liked your comment",
             mapOf("type"      to NotificationTypes.LIKE_COMMENT,
                 "postId"    to postId,
-                "commentId" to commentId))
+                "commentId" to commentId,
+                "fromUserId" to fromUserId ))
     }
 
     // ─────────────────────────────────────────────

@@ -1,9 +1,11 @@
 package com.example.uplyft.ui.main
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -13,6 +15,7 @@ import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import com.example.uplyft.R
 import com.example.uplyft.databinding.ActivityMainBinding
+import com.example.uplyft.utils.NotificationTypes
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
@@ -27,7 +30,13 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         setupNavigation()
         requestNotificationPermission()
-        handleNotificationDeepLink()
+        binding.root.post {
+            handleNotificationDeepLink(intent)
+        }
+    }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleNotificationDeepLink(intent)
     }
 
     override fun onStart() {
@@ -73,34 +82,48 @@ class MainActivity : AppCompatActivity() {
     // DEEP LINK — tap notification → navigate
     // ─────────────────────────────────────────────
 
-    private fun handleNotificationDeepLink() {
-        val type      = intent.getStringExtra("type")      ?: return
-        val postId    = intent.getStringExtra("postId")    ?: ""
-        val commentId = intent.getStringExtra("commentId") ?: ""
+    private fun handleNotificationDeepLink(intent: Intent?) {
+        val type      = intent?.getStringExtra("type")      ?: return
+        val postId    = intent.getStringExtra("postId")     ?: ""
+        val fromUser  = intent.getStringExtra("fromUserId") ?: ""
 
-        // wait for nav controller to be ready
-        binding.root.post {
-            val navHostFragment = supportFragmentManager
-                .findFragmentById(R.id.navHostFragment) as? NavHostFragment
-                ?: return@post
-            val navController = navHostFragment.navController
+        val navHostFragment = supportFragmentManager
+            .findFragmentById(R.id.navHostFragment) as? NavHostFragment
+            ?: return
+        val navController = navHostFragment.navController
 
-            when (type) {
-                "follow",
-                "follow_back" -> {
-                    // navigate to notifications or profile
-                }
-                "like_post",
-                "comment",
-                "reply",
-                "like_comment" -> {
-                    if (postId.isNotEmpty()) {
-                        val bundle = Bundle().apply {
-                            putString("postId", postId)
-                        }
+        when (type) {
+            // ✅ like or comment → open post detail
+            NotificationTypes.LIKE_POST,
+            NotificationTypes.COMMENT,
+            NotificationTypes.LIKE_COMMENT -> {
+                if (postId.isNotEmpty()) {
+                    val bundle = Bundle().apply {
+                        putString("postId", postId)
+                    }
+                    try {
                         navController.navigate(
                             R.id.postDetailFragment, bundle
                         )
+                    } catch (e: Exception) {
+                        Log.e("DeepLink", "Navigate failed: ${e.message}")
+                    }
+                }
+            }
+
+            // ✅ follow → open that user's profile
+            NotificationTypes.FOLLOW,
+            NotificationTypes.FOLLOW_BACK -> {
+                if (fromUser.isNotEmpty()) {
+                    val bundle = Bundle().apply {
+                        putString("userId", fromUser)
+                    }
+                    try {
+                        navController.navigate(
+                            R.id.userProfileFragment, bundle
+                        )
+                    } catch (e: Exception) {
+                        Log.e("DeepLink", "Navigate failed: ${e.message}")
                     }
                 }
             }

@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.tasks.await
 
 
 // viewmodel/NotificationViewModel.kt
@@ -17,6 +19,7 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
 
     private val notifSource = NotificationFirebaseSource()
     private val db          = FirebaseFirestore.getInstance()
+
     private val _notifications = MutableStateFlow<List<Notification>>(emptyList())
     val notifications: StateFlow<List<Notification>> = _notifications
 
@@ -25,65 +28,102 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
 
     private val _unreadCount = MutableStateFlow(0)
     val unreadCount: StateFlow<Int> = _unreadCount
-    private var listenerRegistration: com.google.firebase.firestore.ListenerRegistration? = null
 
-    fun loadNotifications(userId: String) {
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                val list             = notifSource.getNotifications(userId)
+    private var unreadListener  : ListenerRegistration? = null
+    private var notifListener   : ListenerRegistration? = null
+
+    fun startListeningNotifications(userId: String) {
+        // Don't recreate listener if already listening
+        if (notifListener != null) return
+
+        _isLoading.value = true
+
+        notifListener = db.collection("notifications")
+            .whereEqualTo("toUserId", userId)
+            .addSnapshotListener { snapshot, error ->
+                _isLoading.value = false
+
+                if (error != null) {
+                    Log.e("NotifVM", "Notif listener error: ${error.message}")
+                    return@addSnapshotListener
+                }
+
+                val list = snapshot?.documents?.mapNotNull { doc ->
+                    try {
+                        Notification(
+                            id           = doc.id,
+                            type         = doc.getString("type")         ?: "",
+                            fromUserId   = doc.getString("fromUserId")   ?: "",
+                            fromUsername = doc.getString("fromUsername") ?: "",
+                            fromImage    = doc.getString("fromImage")    ?: "",
+                            toUserId     = doc.getString("toUserId")     ?: "",
+                            postId       = doc.getString("postId")       ?: "",
+                            commentId    = doc.getString("commentId")    ?: "",
+                            message      = doc.getString("message")      ?: "",
+                            isRead       = doc.getBoolean("isRead")      ?: false,
+                            createdAt    = doc.getLong("createdAt")      ?: 0L
+                        )
+                    } catch (e: Exception) { null }
+                }?.sortedByDescending { it.createdAt } ?: emptyList()
+
                 _notifications.value = list
-                // ✅ sync unread count from loaded list
-                _unreadCount.value   = list.count { !it.isRead }
+            }
+    }
+    fun startListeningUnreadCount(userId: String) {
+        // Don't recreate listener if already listening
+        if (unreadListener != null) return
+
+        unreadListener = db.collection("notifications")
+            .whereEqualTo("toUserId", userId)
+            .whereEqualTo("isRead", false)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) return@addSnapshotListener
+                _unreadCount.value = snapshot?.documents?.size ?: 0
+            }
+    }
+
+    fun stopListening() {
+        unreadListener?.remove()
+        unreadListener = null
+        notifListener?.remove()
+        notifListener  = null
+    }
+
+    fun refreshNotifications(userId: String) {
+        viewModelScope.launch {
+            try {
+                _isLoading.value = true
+                val notifications = notifSource.getNotifications(userId)
+                _notifications.value = notifications
             } catch (e: Exception) {
-                Log.e("NotifVM", "Error: ${e.message}")
+                Log.e("NotifVM", "refreshNotifications failed: ${e.message}")
             } finally {
                 _isLoading.value = false
             }
         }
     }
 
-    // ✅ real-time badge — updates instantly when new notif arrives
-    fun startListeningUnreadCount(userId: String) {
-        // remove existing listener first
-        listenerRegistration?.remove()
-
-        listenerRegistration = db.collection("notifications")
-            .whereEqualTo("toUserId", userId)
-            .whereEqualTo("isRead", false)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Log.e("NotifVM", "Listener error: ${error.message}")
-                    return@addSnapshotListener
-                }
-                val count        = snapshot?.documents?.size ?: 0
-                _unreadCount.value = count
-                Log.d("NotifVM", "Unread count updated: $count")
-            }
-    }
-
-    fun stopListening() {
-        listenerRegistration?.remove()
-        listenerRegistration = null
-    }
-
     fun markAllRead(userId: String) {
         viewModelScope.launch {
             try {
-                // ✅ update local state instantly — no waiting for Firestore
-                _notifications.value = _notifications.value
-                    .map { it.copy(isRead = true) }
-                _unreadCount.value = 0
-
-                // ✅ then sync to Firestore in background
                 notifSource.markAllRead(userId)
-
             } catch (e: Exception) {
                 Log.e("NotifVM", "markAllRead failed: ${e.message}")
             }
         }
     }
-
+    fun markSingleRead(notifId: String, userId: String) {
+        viewModelScope.launch {
+            try {
+                db.collection("notifications")
+                    .document(notifId)
+                    .update("isRead", true)
+                    .await()
+            } catch (e: Exception) {
+                Log.e("NotifVM", "markSingleRead failed: ${e.message}")
+            }
+        }
+    }
     fun refreshUnreadCount(userId: String) {
         viewModelScope.launch {
             try {

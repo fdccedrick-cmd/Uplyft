@@ -1,14 +1,117 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".ui.main.notifications.NotificationsFragment">
+    android:orientation="vertical"
+    android:background="@color/background">
 
-    <!-- TODO: Update blank fragment layout -->
-    <TextView
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp">
+
+        <ImageView
+            android:id="@+id/ivBack"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_back"
+            app:tint="@color/on_background"
+            android:contentDescription="Back"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Notifications"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/on_background"
+            android:layout_marginStart="16dp"/>
+
+        <TextView
+            android:id="@+id/tvMarkAllRead"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Mark all read"
+            android:textSize="13sp"
+            android:textColor="#0095F6"
+            android:visibility="gone"/>
+
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.5dp"
+        android:background="@color/divider"/>
+
+    <!-- Loading shimmer -->
+    <com.facebook.shimmer.ShimmerFrameLayout
+        android:id="@+id/shimmerLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <include layout="@layout/item_notif_shimmer"/>
+            <include layout="@layout/item_notif_shimmer"/>
+            <include layout="@layout/item_notif_shimmer"/>
+            <include layout="@layout/item_notif_shimmer"/>
+            <include layout="@layout/item_notif_shimmer"/>
+
+        </LinearLayout>
+
+    </com.facebook.shimmer.ShimmerFrameLayout>
+
+    <!-- Empty state -->
+    <LinearLayout
+        android:id="@+id/layoutEmpty"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:text="@string/hello_blank_fragment" />
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="gone">
 
-</FrameLayout>
+        <ImageView
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:src="@drawable/ic_notifications"
+            android:tint="#DDDDDD"
+            android:layout_marginBottom="16dp"
+            android:contentDescription="No notifications"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="No notifications yet"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="@color/on_background"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="When someone likes or comments\non your posts, you'll see it here"
+            android:textSize="13sp"
+            android:textColor="#AAAAAA"
+            android:gravity="center"
+            android:layout_marginTop="8dp"/>
+
+    </LinearLayout>
+
+    <!-- Notifications list -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvNotifications"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:overScrollMode="never"/>
+
+</LinearLayout>

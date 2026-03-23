@@ -5,56 +5,176 @@ import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
+import androidx.fragment.app.activityViewModels
 import com.example.uplyft.R
+import com.example.uplyft.databinding.FragmentNotificationsBinding
+import com.example.uplyft.domain.model.Notification
+import com.example.uplyft.ui.adapter.NotificationAdapter
+import com.example.uplyft.utils.NotificationTypes
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.navigation.fragment.findNavController
+import androidx.recyclerview.widget.LinearLayoutManager
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import com.example.uplyft.viewmodel.NotificationViewModel
 
-// TODO: Rename parameter arguments, choose names that match
-// the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
-private const val ARG_PARAM1 = "param1"
-private const val ARG_PARAM2 = "param2"
 
-/**
- * A simple [Fragment] subclass.
- * Use the [NotificationsFragment.newInstance] factory method to
- * create an instance of this fragment.
- */
+// ui/main/notifications/NotificationsFragment.kt
 class NotificationsFragment : Fragment() {
-    // TODO: Rename and change types of parameters
-    private var param1: String? = null
-    private var param2: String? = null
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        arguments?.let {
-            param1 = it.getString(ARG_PARAM1)
-            param2 = it.getString(ARG_PARAM2)
-        }
-    }
+    private var _binding: FragmentNotificationsBinding? = null
+    private val binding get() = _binding!!
+
+    private var hasLoaded = false
+    private val viewModel: NotificationViewModel by activityViewModels()
+    private lateinit var notifAdapter: NotificationAdapter
+
+    private val currentUid get() =
+        FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
-        // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_notifications, container, false)
+    ): View {
+        _binding = FragmentNotificationsBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
-    companion object {
-        /**
-         * Use this factory method to create a new instance of
-         * this fragment using the provided parameters.
-         *
-         * @param param1 Parameter 1.
-         * @param param2 Parameter 2.
-         * @return A new instance of fragment NotificationsFragment.
-         */
-        // TODO: Rename and change types and number of parameters
-        @JvmStatic
-        fun newInstance(param1: String, param2: String) =
-            NotificationsFragment().apply {
-                arguments = Bundle().apply {
-                    putString(ARG_PARAM1, param1)
-                    putString(ARG_PARAM2, param2)
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        setupRecycler()
+        setupClickListeners()
+        observeData()
+
+        if (!hasLoaded) {
+            hasLoaded = true
+            viewModel.loadNotifications(currentUid)
+        }
+    }
+    override fun onResume() {
+        super.onResume()
+        viewModel.markAllRead(currentUid)
+    }
+
+    private fun setupRecycler() {
+        notifAdapter = NotificationAdapter(
+            currentUid    = currentUid,
+            onItemClick   = { notif -> handleNotifClick(notif) },
+            onFollowClick = { notif -> handleFollowClick(notif) }
+        )
+        binding.rvNotifications.apply {
+            layoutManager = LinearLayoutManager(requireContext())
+            adapter       = notifAdapter
+        }
+    }
+
+    private fun setupClickListeners() {
+        binding.ivBack.setOnClickListener {
+            findNavController().popBackStack()
+        }
+
+        binding.tvMarkAllRead.setOnClickListener {
+            viewModel.markAllRead(currentUid)
+        }
+    }
+
+    private fun observeData() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+
+                launch {
+                    viewModel.isLoading.collect { loading ->
+                        binding.shimmerLayout.visibility =
+                            if (loading) View.VISIBLE else View.GONE
+                        if (loading) binding.shimmerLayout
+                            .startShimmer()
+                        else binding.shimmerLayout.stopShimmer()
+                    }
+                }
+
+                launch {
+                    viewModel.notifications.collect { list ->
+                        notifAdapter.submitList(list)
+
+                        binding.layoutEmpty.visibility =
+                            if (list.isEmpty()) View.VISIBLE else View.GONE
+                        binding.rvNotifications.visibility =
+                            if (list.isEmpty()) View.GONE else View.VISIBLE
+
+                        // show mark all read only if unread exist
+                        val hasUnread = list.any { !it.isRead }
+                        binding.tvMarkAllRead.visibility =
+                            if (hasUnread) View.VISIBLE else View.GONE
+                    }
                 }
             }
+        }
+    }
+
+    private fun handleNotifClick(notif: Notification) {
+        when (notif.type) {
+            NotificationTypes.LIKE_POST,
+            NotificationTypes.COMMENT,
+            NotificationTypes.LIKE_COMMENT -> {
+                if (notif.postId.isNotEmpty()) {
+                    val bundle = Bundle().apply {
+                        putString("postId", notif.postId)
+                    }
+                    findNavController().navigate(
+                        R.id.action_notificationsFragment_to_postDetailFragment,
+                        bundle
+                    )
+                }
+            }
+            NotificationTypes.FOLLOW,
+            NotificationTypes.FOLLOW_BACK -> {
+                val bundle = Bundle().apply {
+                    putString("userId", notif.fromUserId)
+                }
+                findNavController().navigate(
+                    R.id.action_notificationsFragment_to_userProfileFragment,
+                    bundle
+                )
+            }
+        }
+    }
+
+    private fun handleFollowClick(notif: Notification) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val db         = FirebaseFirestore.getInstance()
+                val followId   = "${currentUid}_${notif.fromUserId}"
+                val followRef  = db.collection("follows").document(followId)
+                val exists     = followRef.get().await().exists()
+
+                if (!exists) {
+                    followRef.set(mapOf(
+                        "followerId"  to currentUid,
+                        "followingId" to notif.fromUserId,
+                        "createdAt"   to System.currentTimeMillis()
+                    )).await()
+                    Toast.makeText(requireContext(),
+                        "Following @${notif.fromUsername}", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(requireContext(),
+                        "Already following @${notif.fromUsername}", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(),
+                    "Failed to follow", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
     }
 }

@@ -16,17 +16,19 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
+        <!-- Add post -->
         <ImageView
             android:id="@+id/ivAddPost"
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:src="@drawable/ic_add"
-            app:tint="@color/text_color"
+            app:tint="@color/on_background"
             android:contentDescription="Add post"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"/>
 
+        <!-- Logo centered -->
         <TextView
             android:id="@+id/tvLogo"
             android:layout_width="wrap_content"
@@ -34,23 +36,45 @@
             android:text="Uplyft"
             android:textSize="30sp"
             android:fontFamily="@font/billabong"
-            android:textColor="@color/text_color"
-            app:layout_constraintStart_toEndOf="@id/ivAddPost"
-            app:layout_constraintEnd_toStartOf="@id/ivNotifications"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintHorizontal_bias="0.5"/>
-
-        <ImageView
-            android:id="@+id/ivNotifications"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:src="@drawable/ic_notifications"
-            app:tint="@color/text_color"
-            android:contentDescription="Notifications"
+            android:textColor="@color/on_background"
+            app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"/>
+
+        <!-- replace the existing ivNotifications + tvNotifBadge with this -->
+        <FrameLayout
+            android:id="@+id/layoutNotifIcon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent">
+
+            <!-- bell icon -->
+            <ImageView
+                android:id="@+id/ivNotifications"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_notifications"
+                app:tint="@color/on_background"
+                android:contentDescription="Notifications"/>
+
+            <!-- ✅ red badge — top right corner of bell -->
+            <TextView
+                android:id="@+id/tvNotifBadge"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_gravity="top|end"
+                android:gravity="center"
+                android:textSize="9sp"
+                android:textColor="@android:color/white"
+                android:textStyle="bold"
+                android:background="@drawable/bg_notif_badge"
+                android:visibility="gone"/>
+
+        </FrameLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
@@ -58,7 +82,7 @@
         android:id="@+id/headerDivider"
         android:layout_width="0dp"
         android:layout_height="1dp"
-        android:background="@color/divider_color"
+        android:background="@color/divider"
         app:layout_constraintTop_toBottomOf="@id/header"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>
@@ -74,7 +98,6 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- Repeat shimmer cards -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -85,8 +108,10 @@
             <include layout="@layout/item_post_shimmer"/>
 
         </LinearLayout>
+
     </com.facebook.shimmer.ShimmerFrameLayout>
 
+    <!-- Feed -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefresh"
         android:layout_width="0dp"

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/nav_graph"
     app:startDestination="@id/homeFragment">
 
@@ -97,5 +98,26 @@
             android:id="@+id/action_profileFragment_to_postDetailFragment"
             app:destination="@id/postDetailFragment"/>
     </fragment>
+
+    <fragment
+        android:id="@+id/notificationsFragment"
+        android:name="com.example.uplyft.ui.main.notifications.NotificationsFragment"
+        android:label="Notifications"
+        tools:layout="@layout/fragment_notifications">
+
+        <action
+            android:id="@+id/action_notificationsFragment_to_postDetailFragment"
+            app:destination="@id/postDetailFragment"/>
+
+        <action
+            android:id="@+id/action_notificationsFragment_to_userProfileFragment"
+            app:destination="@id/userProfileFragment"/>
+
+    </fragment>
+
+    <!-- add action in homeFragment -->
+    <action
+        android:id="@+id/action_homeFragment_to_notificationsFragment"
+        app:destination="@id/notificationsFragment"/>
 
 </navigation>

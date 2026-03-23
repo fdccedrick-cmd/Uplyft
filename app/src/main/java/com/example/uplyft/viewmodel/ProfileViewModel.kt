@@ -35,16 +35,15 @@ import com.example.uplyft.data.local.entity.FollowEntity
 class ProfileViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db             = AppDatabase.getInstance(application)
-    private val followSource   = FollowFirebaseSource()
+    private val followSource   = FollowFirebaseSource(application.applicationContext)
     private val cloudinary     by lazy { CloudinaryService(application.applicationContext) }
 
-    private val repository by lazy {
-        PostRepository(
-            postDao           = db.postDao(),
-            firebaseSource    = PostFirebaseSource(),
-            cloudinaryService = cloudinary
-        )
-    }
+    private val repository = PostRepository(
+        context           = application.applicationContext,
+        postDao           = AppDatabase.getInstance(application).postDao(),
+        firebaseSource    = PostFirebaseSource(),
+        cloudinaryService = CloudinaryService(application.applicationContext)
+    )
 
     private val _profileState = MutableStateFlow<Resource<UserProfileState>?>(null)
     val profileState: StateFlow<Resource<UserProfileState>?> = _profileState

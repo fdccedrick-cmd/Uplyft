@@ -1,6 +1,8 @@
 package com.example.uplyft.data.repository
 
 import android.net.Uri
+import android.util.Log
+import android.content.Context
 import com.example.uplyft.data.local.dao.PostDao
 import com.example.uplyft.data.local.entity.PostEntity
 import com.example.uplyft.data.local.entity.toDomain
@@ -9,6 +11,7 @@ import com.example.uplyft.data.remote.cloudinary.CloudinaryService
 import com.example.uplyft.data.remote.firebase.PostFirebaseSource
 import com.example.uplyft.domain.model.Post
 import com.example.uplyft.utils.Constants.USERS_COLLECTION
+import com.example.uplyft.utils.NotificationSender
 import com.example.uplyft.utils.PostUploadState
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -30,6 +33,7 @@ import kotlin.collections.joinToString
 
 // data/repository/PostRepository.kt
 class PostRepository(
+    private val context          : Context,
     private val postDao          : PostDao,
     private val firebaseSource   : PostFirebaseSource,
     private val cloudinaryService: CloudinaryService
@@ -121,6 +125,22 @@ class PostRepository(
                     likeRef.set(mapOf("likedAt" to System.currentTimeMillis())).await()
                     postRef.update("likesCount",
                         FieldValue.increment(1)).await()
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            val fromUser = FirebaseFirestore.getInstance()
+                                .collection("users")
+                                .document(userId).get().await()
+                            NotificationSender(context).sendLikePostNotification(
+                                fromUserId   = userId,
+                                fromUsername = fromUser.getString("username") ?: "",
+                                fromImage    = fromUser.getString("profileImageUrl") ?: "",
+                                toUserId     = post.userId,
+                                postId       = post.postId
+                            )
+                        } catch (e: Exception) {
+                            Log.e("Like", "Notif failed: ${e.message}")
+                        }
+                    }
                 } else {
                     likeRef.delete().await()
                     postRef.update("likesCount",

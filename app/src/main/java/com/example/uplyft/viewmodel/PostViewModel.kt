@@ -24,7 +24,12 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     private val db             = AppDatabase.getInstance(application)
     private val cloudinary = CloudinaryService(application.applicationContext)
     private val firebaseSource = PostFirebaseSource()
-    private val repository     = PostRepository(db.postDao(), firebaseSource, cloudinary)
+    private val repository = PostRepository(
+        context           = application.applicationContext,
+        postDao           = AppDatabase.getInstance(application).postDao(),
+        firebaseSource    = PostFirebaseSource(),
+        cloudinaryService = CloudinaryService(application.applicationContext)
+    )
 
     // Feed from Room — auto-updates
     val posts: StateFlow<List<Post>> = repository

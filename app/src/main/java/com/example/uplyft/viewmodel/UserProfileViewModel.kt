@@ -21,7 +21,7 @@ import kotlinx.coroutines.tasks.await
 class UserProfileViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db               = AppDatabase.getInstance(application)
-    private val followSource     = FollowFirebaseSource()
+    private val followSource     = FollowFirebaseSource(application.applicationContext)
     private val firebaseSource   = PostFirebaseSource()
 
     private val _profileState = MutableStateFlow<Resource<UserProfileState>?>(null)

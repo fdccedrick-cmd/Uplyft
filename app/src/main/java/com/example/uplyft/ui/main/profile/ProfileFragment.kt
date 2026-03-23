@@ -98,6 +98,10 @@ class ProfileFragment : Fragment() {
         permissionManager = PermissionManager(this)
         setupPostsGrid()
         setupClickListeners()
+
+        // ✅ Start shimmer animation when fragment loads
+        binding.shimmerLoadingContainer.startShimmer()
+
         loadProfile()
         observeStates()
     }
@@ -180,6 +184,11 @@ class ProfileFragment : Fragment() {
                     if (_binding == null) return@collect
                     profilePostAdapter.submitList(posts)
                     binding.tvPostCount.text = posts.size.toString()
+
+                    // ✅ Stop shimmer and hide it when posts load
+                    binding.shimmerLoadingContainer.stopShimmer()
+                    binding.shimmerLoadingContainer.visibility = View.GONE
+                    binding.rvProfilePosts.visibility = View.VISIBLE
                 }
             }
         }

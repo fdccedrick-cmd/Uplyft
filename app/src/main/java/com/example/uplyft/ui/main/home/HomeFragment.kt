@@ -9,9 +9,6 @@ import com.example.uplyft.R
 import com.example.uplyft.databinding.FragmentHomeBinding
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.cancel
@@ -31,12 +28,16 @@ import android.widget.Toast
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.firebase.auth.FirebaseAuth
 import com.example.uplyft.ui.main.comments.CommentsBottomSheet
+import com.example.uplyft.viewmodel.NotificationViewModel
+import androidx.fragment.app.viewModels
+
 
 class HomeFragment : Fragment() {
 
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
     private val postViewModel: PostViewModel by activityViewModels()
+    private val notifViewModel: NotificationViewModel by activityViewModels()
     private lateinit var postAdapter: PostAdapter
 
     override fun onCreateView(
@@ -50,11 +51,46 @@ class HomeFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+
+        notifViewModel.startListeningUnreadCount(currentUid)
+
+        binding.ivNotifications.setOnClickListener {
+            findNavController().navigate(
+                R.id.action_homeFragment_to_notificationsFragment
+            )
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                notifViewModel.unreadCount.collect { count ->
+                    if (count > 0) {
+                        binding.tvNotifBadge.visibility = View.VISIBLE
+                        binding.tvNotifBadge.text =
+                            if (count > 99) "99+" else count.toString()
+                    } else {
+                        binding.tvNotifBadge.visibility = View.GONE
+                    }
+                }
+            }
+        }
+
         setupRecyclerView()
         setupClickListeners()
         observeFeedState()
         observePosts()
         setupSwipeRefresh()
+
+        parentFragmentManager.setFragmentResultListener(
+            "navigate_to_profile",
+            viewLifecycleOwner
+        ) { _, bundle ->
+            val userId = bundle.getString("userId") ?: return@setFragmentResultListener
+            val b = Bundle().apply { putString("userId", userId) }
+            findNavController().navigate(
+                R.id.action_homeFragment_to_userProfileFragment, b
+            )
+        }
     }
     private fun setupSwipeRefresh() {
         binding.swipeRefresh.apply {

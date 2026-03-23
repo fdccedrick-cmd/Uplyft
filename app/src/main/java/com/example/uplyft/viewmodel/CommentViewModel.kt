@@ -22,7 +22,7 @@ import com.google.firebase.firestore.FieldValue
 
 class CommentViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val commentSource = CommentFirebaseSource()
+    private val commentSource = CommentFirebaseSource(application.applicationContext)
     private val db = AppDatabase.getInstance(application)
 
     private val _comments = MutableStateFlow<List<Comment>>(emptyList())

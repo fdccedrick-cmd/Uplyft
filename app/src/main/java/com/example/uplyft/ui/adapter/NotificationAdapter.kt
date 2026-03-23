@@ -19,6 +19,7 @@ import com.example.uplyft.domain.model.Notification
 import com.example.uplyft.utils.NotificationTypes
 import com.google.android.material.imageview.ShapeableImageView
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 
 
 // ui/adapter/NotificationAdapter.kt
@@ -29,6 +30,7 @@ class NotificationAdapter(
 ) : RecyclerView.Adapter<NotificationAdapter.NotifVH>() {
 
     private val items = mutableListOf<Notification>()
+    private val followListeners = mutableMapOf<String, ListenerRegistration>()
 
     fun submitList(list: List<Notification>) {
         items.clear()
@@ -50,7 +52,13 @@ class NotificationAdapter(
 
     inner class NotifVH(view: View) : RecyclerView.ViewHolder(view) {
 
+        private var followListener: ListenerRegistration? = null
+
         fun bind(notif: Notification) {
+            // Clean up any existing listener for this ViewHolder
+            followListener?.remove()
+            followListener = null
+
             // unread dot
             itemView.findViewById<View>(R.id.vUnread).visibility =
                 if (!notif.isRead) View.VISIBLE else View.GONE
@@ -119,6 +127,10 @@ class NotificationAdapter(
                 NotificationTypes.FOLLOW_BACK -> {
                     ivThumb.visibility  = View.GONE
                     tvFollow.visibility = View.VISIBLE
+
+                    // Check follow status and update button in real-time
+                    followListener = checkFollowStatus(notif.fromUserId, tvFollow)
+
                     tvFollow.setOnClickListener { onFollowClick(notif) }
                 }
                 else -> {
@@ -140,5 +152,33 @@ class NotificationAdapter(
                 else               -> "${diff / 604_800_000}w"
             }
         }
+    }
+
+    private fun checkFollowStatus(targetUserId: String, button: TextView): ListenerRegistration {
+        val followId = "${currentUid}_${targetUserId}"
+
+        return FirebaseFirestore.getInstance()
+            .collection("follows")
+            .document(followId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) return@addSnapshotListener
+
+                val isFollowing = snapshot?.exists() == true
+                button.text = if (isFollowing) "Following" else "Follow"
+                button.setBackgroundResource(
+                    if (isFollowing) R.drawable.bg_button_secondary
+                    else R.drawable.bg_button_primary
+                )
+                button.setTextColor(
+                    if (isFollowing) ContextCompat.getColor(button.context, R.color.on_background)
+                    else ContextCompat.getColor(button.context, android.R.color.white)
+                )
+                button.isEnabled = true
+            }
+    }
+
+    fun cleanup() {
+        followListeners.values.forEach { it.remove() }
+        followListeners.clear()
     }
 }

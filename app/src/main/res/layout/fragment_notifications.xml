@@ -37,7 +37,7 @@
             android:id="@+id/tvMarkAllRead"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Mark all read"
+            android:text="Mark all as read"
             android:textSize="13sp"
             android:textColor="#0095F6"
             android:visibility="gone"/>

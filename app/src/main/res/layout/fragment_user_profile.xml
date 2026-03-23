@@ -222,7 +222,7 @@
                 <Button
                     android:id="@+id/btnFollow"
                     android:layout_width="0dp"
-                    android:layout_height="34dp"
+                    android:layout_height="60dp"
                     android:layout_weight="1"
                     android:text="Follow"
                     android:textAllCaps="false"
@@ -236,7 +236,7 @@
                 <Button
                     android:id="@+id/btnMessage"
                     android:layout_width="0dp"
-                    android:layout_height="34dp"
+                    android:layout_height="60dp"
                     android:layout_weight="1"
                     android:text="Message"
                     android:textAllCaps="false"

@@ -46,14 +46,7 @@ class FollowFirebaseSource (
                     .document("${followingId}_${followerId}")
                     .get().await().exists()
 
-                if (isFollowBack) {
-                    sender.sendFollowBackNotification(
-                        fromUserId   = followerId,
-                        fromUsername = username,
-                        fromImage    = image,
-                        toUserId     = followingId
-                    )
-                }
+
             } catch (e: Exception) {
                 Log.e("Follow", "Notif failed: ${e.message}")
             }

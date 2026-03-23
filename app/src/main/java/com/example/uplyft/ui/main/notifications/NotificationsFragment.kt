@@ -195,6 +195,7 @@ class NotificationsFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        notifAdapter.cleanup()
         _binding = null
     }
 }

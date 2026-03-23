@@ -13,10 +13,12 @@ import com.example.uplyft.data.local.dao.FollowDao
 import com.example.uplyft.data.local.entity.FollowEntity
 import com.example.uplyft.data.local.dao.UserStatsDao
 import com.example.uplyft.data.local.entity.UserStatsEntity
+import com.example.uplyft.data.local.dao.SearchHistoryDao
+import com.example.uplyft.data.local.entity.SearchHistoryEntity
 
 @Database(
-    entities = [PostEntity::class, UserEntity::class, FollowEntity::class, UserStatsEntity::class],
-    version = 10,
+    entities = [PostEntity::class, UserEntity::class, FollowEntity::class, UserStatsEntity::class, SearchHistoryEntity::class],
+    version = 12,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -24,6 +26,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun userDao(): UserDao
     abstract fun followDao(): FollowDao
     abstract fun userStatsDao(): UserStatsDao
+    abstract fun searchHistoryDao(): SearchHistoryDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -41,3 +44,4 @@ abstract class AppDatabase : RoomDatabase() {
         }
     }
 }
+

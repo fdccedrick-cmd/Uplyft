@@ -38,27 +38,7 @@ class NotificationSender(private val context: Context) {
                 "fromUserId" to fromUserId))
     }
 
-    suspend fun sendFollowBackNotification(
-        fromUserId  : String,
-        fromUsername: String,
-        fromImage   : String,
-        toUserId    : String
-    ) {
-        if (fromUserId == toUserId) return
-        save(
-            Notification(
-                type         = NotificationTypes.FOLLOW_BACK,
-                fromUserId   = fromUserId,
-                fromUsername = fromUsername,
-                fromImage    = fromImage,
-                toUserId     = toUserId,
-                message      = "@$fromUsername followed you back"
-            )
-        )
-        push(toUserId, fromUsername, "followed you back",
-            mapOf("type" to NotificationTypes.FOLLOW_BACK,
-                "fromUserId" to fromUserId))
-    }
+
 
     suspend fun sendLikePostNotification(
         fromUserId  : String,

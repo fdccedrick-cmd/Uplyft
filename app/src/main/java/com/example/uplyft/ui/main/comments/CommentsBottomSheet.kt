@@ -4,8 +4,6 @@ import android.app.Dialog
 import android.content.Context
 import android.content.DialogInterface
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
 import android.util.Log
 import android.view.*
 import android.view.inputmethod.InputMethodManager
@@ -21,7 +19,6 @@ import com.bumptech.glide.Glide
 import com.example.uplyft.R
 import com.example.uplyft.data.local.AppDatabase
 import com.example.uplyft.data.local.entity.toDomain
-import com.example.uplyft.domain.model.Comment
 import com.example.uplyft.ui.adapter.CommentAdapter
 import com.example.uplyft.ui.widget.LockedRecyclerView
 import com.example.uplyft.utils.Resource
@@ -37,23 +34,23 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.uplyft.ui.adapter.MentionAdapter
 import com.example.uplyft.viewmodel.MentionViewModel
 import androidx.navigation.fragment.findNavController
+import android.text.Editable
+import android.text.TextWatcher
 
 
 class CommentsBottomSheet : BottomSheetDialogFragment() {
 
     private val viewModel: CommentViewModel by activityViewModels()
 
-    private lateinit var adapter     : CommentAdapter
-    private lateinit var recyclerView: LockedRecyclerView
-    private lateinit var inputBar    : View
-    private lateinit var etComment   : EditText
-    private lateinit var tvPost      : TextView
-    private lateinit var layoutReply : LinearLayout
-    private lateinit var tvReplyingTo: TextView
-    private lateinit var emptyState  : LinearLayout
+    private lateinit var adapter              : CommentAdapter
+    private lateinit var recyclerView         : LockedRecyclerView
+    private lateinit var inputBar             : View
+    private lateinit var etComment            : EditText
+    private lateinit var tvPost               : TextView
+    private lateinit var emptyState           : LinearLayout
+    private lateinit var shimmerLoadingContainer: LinearLayout
 
     private var sheetBehavior  : BottomSheetBehavior<View>? = null
-    private var replyingTo     : Comment? = null
     private var postId         : String?  = null
     private var currentUid     : String?  = null
     private var currentUsername: String   = ""
@@ -96,6 +93,7 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
 
         recyclerView  = view.findViewById(R.id.rvComments)
         emptyState    = view.findViewById(R.id.layoutEmptyState)
+        shimmerLoadingContainer = view.findViewById(R.id.shimmerLoadingContainer)
 
         mentionViewModel = ViewModelProvider(
             this,
@@ -137,7 +135,7 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
         val sheet       = dialog.findViewById<View>(
             com.google.android.material.R.id.design_bottom_sheet
         ) ?: return
-        val windowDecor = dialog.window?.decorView as? ViewGroup ?: return
+        val windowDecor2 = dialog.window?.decorView as? ViewGroup ?: return
 
         sheet.layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT
         sheet.requestLayout()
@@ -145,14 +143,14 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
         val screenH = resources.displayMetrics.heightPixels
 
         sheetBehavior = BottomSheetBehavior.from(sheet).apply {
-            peekHeight        = (screenH * 0.65).toInt()
+            peekHeight        = screenH  // Show full screen at top
             maxHeight         = screenH
-            state             = BottomSheetBehavior.STATE_COLLAPSED
+            state             = BottomSheetBehavior.STATE_EXPANDED  // Start expanded at top
             skipCollapsed     = false
             isHideable        = true
             isDraggable       = true
             isFitToContents   = false
-            halfExpandedRatio = 0.65f
+            halfExpandedRatio = 0.5f
 
             addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
                 override fun onStateChanged(bottomSheet: View, newState: Int) {
@@ -167,19 +165,17 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
         }
 
         inputBar = LayoutInflater.from(requireContext())
-            .inflate(R.layout.layout_comment_input, windowDecor, false)
+            .inflate(R.layout.layout_comment_input, windowDecor2, false)
 
         etComment    = inputBar.findViewById(R.id.etComment)
         tvPost       = inputBar.findViewById(R.id.tvPost)
-        layoutReply  = inputBar.findViewById(R.id.layoutReplyIndicator)
-        tvReplyingTo = inputBar.findViewById(R.id.tvReplyingTo)
 
         val inputParams = FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
         ).apply { gravity = Gravity.BOTTOM }
 
-        windowDecor.addView(inputBar, inputParams)
+        windowDecor2.addView(inputBar, inputParams)
 
         // ✅ set nav spacer immediately
         val navHeight = getNavBarHeight()
@@ -207,10 +203,8 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
         )
 
         // ✅ keyboard detection via root view layout changes
-        val rootView = dialog.window?.decorView?.rootView ?: return
-
         ViewCompat.setWindowInsetsAnimationCallback(
-            windowDecor,
+            windowDecor2,
             object : WindowInsetsAnimationCompat.Callback(DISPATCH_MODE_STOP) {
 
                 override fun onProgress(
@@ -310,14 +304,6 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
             adapter       = mentionAdapter
         }
 
-
-
-        inputBar.findViewById<ImageView>(R.id.ivCancelReply).setOnClickListener {
-            replyingTo             = null
-            layoutReply.visibility = View.GONE
-            etComment.hint         = "Add a comment..."
-        }
-
         etComment.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
             override fun afterTextChanged(s: Editable?) {}
@@ -371,11 +357,7 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
         tvPost.setOnClickListener {
             val text = etComment.text.toString().trim()
             if (text.isEmpty()) return@setOnClickListener
-            val parentId = replyingTo?.commentId ?: ""
-            postId?.let { viewModel.addComment(it, text, parentId) }
-            replyingTo             = null
-            layoutReply.visibility = View.GONE
-            etComment.hint         = "Add a comment..."
+            postId?.let { viewModel.addComment(it, text) }
             etComment.text.clear()
             rvMentions.visibility     = View.GONE
             mentionDivider.visibility = View.GONE
@@ -394,12 +376,6 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
             currentUsername = currentUsername,
             onDelete        = { c ->
                 postId?.let { viewModel.deleteComment(it, c.commentId) }
-            },
-            onReply         = { comment ->
-                replyingTo             = comment
-                layoutReply.visibility = View.VISIBLE
-                tvReplyingTo.text      = "Replying to @${comment.username}"
-                focusKeyboard()
             },
             onLike          = { viewModel.toggleCommentLike(it) },
             onAvatar        = { comment ->
@@ -437,15 +413,15 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
 
                 launch {
                     viewModel.comments.collect { list ->
-                        val topLevel = list.filter { it.parentId.isEmpty() }
-                        val currentCount = topLevel.size
+                        val currentCount = list.size
 
                         adapter.submitFullList(list)
-                        emptyState.visibility   = if (topLevel.isEmpty()) View.VISIBLE else View.GONE
-                        recyclerView.visibility = View.VISIBLE
+                        emptyState.visibility           = if (list.isEmpty()) View.VISIBLE else View.GONE
+                        shimmerLoadingContainer.visibility = View.GONE
+                        recyclerView.visibility         = View.VISIBLE
 
-                        // Only auto-scroll if a new top-level comment was added
-                        if (currentCount > lastCommentCount && topLevel.isNotEmpty()) {
+                        // Only auto-scroll if a new comment was added
+                        if (currentCount > lastCommentCount && list.isNotEmpty()) {
                             recyclerView.post {
                                 if (adapter.itemCount > 0) {
                                     recyclerView.smoothScrollToPosition(adapter.itemCount - 1)

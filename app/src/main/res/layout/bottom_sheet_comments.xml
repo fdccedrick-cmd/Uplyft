@@ -43,13 +43,30 @@
             android:overScrollMode="never"
             android:clipToPadding="false"/>
 
+        <!-- Shimmer Loading Container -->
+        <LinearLayout
+            android:id="@+id/shimmerLoadingContainer"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="visible">
+
+            <include layout="@layout/item_comment_shimmer"/>
+            <include layout="@layout/item_comment_shimmer"/>
+            <include layout="@layout/item_comment_shimmer"/>
+            <include layout="@layout/item_comment_shimmer"/>
+            <include layout="@layout/item_comment_shimmer"/>
+
+        </LinearLayout>
+
         <!-- Empty state -->
         <LinearLayout
             android:id="@+id/layoutEmptyState"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            android:gravity="center"
+            android:gravity="top|center_horizontal"
+            android:paddingTop="60dp"
             android:visibility="gone">
 
             <TextView

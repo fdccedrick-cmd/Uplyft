@@ -69,6 +69,11 @@ class SelectImageFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         permissionManager = PermissionManager(this)
         setupGalleryGrid()
+
+        // ✅ Reset multi-select state when returning to fragment
+        isMultiMode = false
+        galleryAdapter.resetMultiSelect()
+
         checkPermissionAndLoad()
         setupClickListeners()
     }
@@ -80,22 +85,30 @@ class SelectImageFragment : Fragment() {
 
         // ✅ toggle multi-select
         binding.tvSelect.setOnClickListener {
-            isMultiMode = galleryAdapter.toggleMultiSelect()
+            isMultiMode = !isMultiMode
+
             if (isMultiMode) {
-                binding.tvSelect.text            = "Cancel"
+                // Entering multi-select mode
+                galleryAdapter.enterMultiSelectMode()
+                binding.tvSelect.text              = "Cancel"
                 binding.tvSelectedCount.visibility = View.GONE
                 binding.tvNext.visibility          = View.GONE
             } else {
+                // Exiting multi-select mode
+                galleryAdapter.exitMultiSelectMode()
                 binding.tvSelect.text              = "Select"
                 binding.tvSelectedCount.visibility = View.GONE
-                // restore single select next button if image selected
+
+                // Restore single select next button if image selected
                 selectedUri?.let { binding.tvNext.visibility = View.VISIBLE }
             }
         }
 
         binding.tvNext.setOnClickListener {
             val uris = if (isMultiMode) {
-                galleryAdapter.getSelectedUris()
+                val selectedList = galleryAdapter.getSelectedUris()
+                if (selectedList.isEmpty()) return@setOnClickListener
+                selectedList
             } else {
                 listOf(selectedUri ?: return@setOnClickListener)
             }

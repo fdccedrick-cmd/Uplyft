@@ -21,6 +21,11 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
+import kotlin.Exception
+import kotlin.collections.mutableSetOf
+import kotlin.collections.forEach
+import kotlin.collections.map
+import kotlin.collections.joinToString
 
 
 // data/repository/PostRepository.kt
@@ -31,6 +36,7 @@ class PostRepository(
 ) {
 
     private val pendingLikeUpdates = mutableSetOf<String>()
+    private val pendingCommentUpdates = mutableSetOf<String>()
 
     // ─────────────────────────────────────────────
     // OBSERVE
@@ -60,7 +66,9 @@ class PostRepository(
                 currentUserId = currentUserId
             )
             remotePosts.forEach { post ->
-                if (!pendingLikeUpdates.contains(post.postId)) {
+                // Skip if post has pending like or comment updates
+                if (!pendingLikeUpdates.contains(post.postId) &&
+                    !pendingCommentUpdates.contains(post.postId)) {
                     postDao.insertPost(post.toEntity(isSynced = true))
                 }
             }
@@ -75,7 +83,9 @@ class PostRepository(
                 currentUserId = currentUserId
             )
             remotePosts.forEach { post ->
-                if (!pendingLikeUpdates.contains(post.postId)) {
+                // Skip if post has pending like or comment updates
+                if (!pendingLikeUpdates.contains(post.postId) &&
+                    !pendingCommentUpdates.contains(post.postId)) {
                     postDao.insertPost(post.toEntity(isSynced = true))
                 }
             }
@@ -123,6 +133,42 @@ class PostRepository(
                 pendingLikeUpdates.remove(post.postId)
             }
         }
+    }
+
+    // ─────────────────────────────────────────────
+    // COMMENTS
+    // ─────────────────────────────────────────────
+
+    suspend fun incrementCommentCount(postId: String) {
+        try {
+            val currentPost = postDao.getPostById(postId)
+            if (currentPost != null) {
+                postDao.updateCommentCount(postId, currentPost.commentsCount + 1)
+
+                // Protect from being overwritten during refresh
+                pendingCommentUpdates.add(postId)
+                CoroutineScope(Dispatchers.IO).launch {
+                    delay(3000) // 3 seconds protection window
+                    pendingCommentUpdates.remove(postId)
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
+    suspend fun decrementCommentCount(postId: String) {
+        try {
+            val currentPost = postDao.getPostById(postId)
+            if (currentPost != null && currentPost.commentsCount > 0) {
+                postDao.updateCommentCount(postId, currentPost.commentsCount - 1)
+
+                // Protect from being overwritten during refresh
+                pendingCommentUpdates.add(postId)
+                CoroutineScope(Dispatchers.IO).launch {
+                    delay(3000) // 3 seconds protection window
+                    pendingCommentUpdates.remove(postId)
+                }
+            }
+        } catch (_: Exception) {}
     }
 
     // ─────────────────────────────────────────────

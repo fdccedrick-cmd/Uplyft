@@ -19,13 +19,11 @@ class CommentAdapter(
     private val currentUid: String,
     private var currentUsername: String,
     private val onDelete: (Comment) -> Unit,
-    private val onReply: (Comment) -> Unit,
     private val onLike: (Comment) -> Unit,
     private val onAvatar: (Comment) -> Unit,
     private val onUsername: (String) -> Unit
 ) : ListAdapter<Comment, CommentAdapter.VH>(DIFF) {
 
-    private val expanded = mutableSetOf<String>()
     private var allComments: List<Comment> = emptyList()
 
     companion object {
@@ -39,8 +37,7 @@ class CommentAdapter(
             // Return payload when only like state changed
             override fun getChangePayload(oldItem: Comment, newItem: Comment): Any? {
                 return if (oldItem.isLiked != newItem.isLiked ||
-                          oldItem.likesCount != newItem.likesCount ||
-                          oldItem.replyCount != newItem.replyCount) {
+                          oldItem.likesCount != newItem.likesCount) {
                     "like_update"
                 } else null
             }
@@ -48,27 +45,8 @@ class CommentAdapter(
     }
 
     fun submitFullList(list: List<Comment>) {
-        val oldAllComments = allComments
         allComments = list
-
-        val topLevel = list.filter { it.parentId.isEmpty() }
-        submitList(topLevel)
-
-        // Check if any reply likes changed - notify parent to rebuild
-        val oldReplies = oldAllComments.filter { it.parentId.isNotEmpty() }
-        val newReplies = list.filter { it.parentId.isNotEmpty() }
-
-        newReplies.forEach { newReply ->
-            val oldReply = oldReplies.find { it.commentId == newReply.commentId }
-            if (oldReply != null &&
-                (oldReply.isLiked != newReply.isLiked || oldReply.likesCount != newReply.likesCount)) {
-                // Reply like state changed - find and notify parent
-                val parentIndex = topLevel.indexOfFirst { it.commentId == newReply.parentId }
-                if (parentIndex != -1) {
-                    notifyItemChanged(parentIndex, "like_update")
-                }
-            }
-        }
+        submitList(list)
     }
 
     fun updateCurrentUsername(username: String) {
@@ -86,8 +64,6 @@ class CommentAdapter(
         if (payloads.contains("like_update")) {
             val comment = getItem(position)
             holder.bindLike(comment)
-            // Also rebuild replies to show updated like states
-            holder.rebindReplies(comment)
         } else {
             super.onBindViewHolder(holder, position, payloads)
         }
@@ -114,16 +90,9 @@ class CommentAdapter(
     inner class VH(private val b: ItemCommentBinding) : RecyclerView.ViewHolder(b.root) {
 
         fun bind(c: Comment) {
-
             b.root.alpha = if (c.isPending) 0.5f else 1f
 
-            // ✅ CRITICAL: Clear reply views to prevent recycling issues
-            b.layoutReplies.removeAllViews()
-            b.layoutReplies.visibility = View.GONE
-            b.layoutViewReplies.visibility = View.GONE
-
-            // ✅ clear previous image BEFORE loading new one
-            // prevents wrong avatar showing during fast scroll
+            // ...existing code...
             Glide.with(b.root)
                 .clear(b.ivUserAvatar)
 
@@ -135,10 +104,7 @@ class CommentAdapter(
                 .diskCacheStrategy(DiskCacheStrategy.ALL)
                 .into(b.ivUserAvatar)
 
-            // ✅ username always set fresh
             b.tvUsername.text = c.username.ifEmpty { "user" }
-
-            // ✅ timestamp beside username
             b.tvTime.text = if (c.isPending) "Sending..."
             else getRelativeTime(c.createdAt)
             b.tvTime.visibility = View.VISIBLE
@@ -146,17 +112,15 @@ class CommentAdapter(
             bindText(c)
             bindLike(c)
 
-            b.tvReply.setOnClickListener { onReply(c) }
             b.ivLikeComment.setOnClickListener {
                 animateLike(b.ivLikeComment, !c.isLiked)
                 onLike(c)
             }
 
-            // ✅ make avatar and username clickable
+            // ...existing code...
             b.ivUserAvatar.setOnClickListener { onAvatar(c) }
             b.tvUsername.setOnClickListener { onAvatar(c) }
 
-            // ✅ long press delete
             if (c.userId == currentUid && !c.isPending) {
                 b.root.setOnLongClickListener {
                     AlertDialog.Builder(b.root.context)
@@ -169,8 +133,6 @@ class CommentAdapter(
             } else {
                 b.root.setOnLongClickListener(null)
             }
-
-            setupReplies(c)
         }
 
         fun bindLike(c: Comment) {
@@ -255,121 +217,6 @@ class CommentAdapter(
             }
         }
 
-        fun rebindReplies(c: Comment) {
-            // Only rebuild if currently expanded
-            if (expanded.contains(c.commentId) && b.layoutReplies.visibility == View.VISIBLE) {
-                val replies = allComments.filter { it.parentId == c.commentId }
-                if (replies.isNotEmpty()) {
-                    b.layoutReplies.removeAllViews()
-                    buildReplyViews(replies)
-                }
-            }
-        }
-
-        private fun setupReplies(c: Comment) {
-            val replies = allComments.filter { it.parentId == c.commentId }
-
-            if (replies.isEmpty()) {
-                b.layoutViewReplies.visibility = View.GONE
-                b.layoutReplies.visibility = View.GONE
-                return
-            }
-
-            val isExpanded = expanded.contains(c.commentId)
-
-            b.layoutViewReplies.visibility = View.VISIBLE
-            b.tvViewReplies.text =
-                if (isExpanded) "Hide replies"
-                else "View replies (${replies.size})"
-
-            b.layoutReplies.visibility =
-                if (isExpanded) View.VISIBLE else View.GONE
-
-            b.layoutViewReplies.setOnClickListener {
-                val position = bindingAdapterPosition
-                if (position == RecyclerView.NO_POSITION) return@setOnClickListener
-
-                if (isExpanded) {
-                    expanded.remove(c.commentId)
-                    // Clear views when collapsing
-                    b.layoutReplies.removeAllViews()
-                } else {
-                    expanded.add(c.commentId)
-                }
-
-                // Just toggle visibility without notifying
-                val nowExpanded = expanded.contains(c.commentId)
-                b.tvViewReplies.text = if (nowExpanded) "Hide replies" else "View replies (${replies.size})"
-                b.layoutReplies.visibility = if (nowExpanded) View.VISIBLE else View.GONE
-
-                // Build views when expanding
-                if (nowExpanded) {
-                    b.layoutReplies.removeAllViews()  // Clear first
-                    buildReplyViews(replies)
-                }
-            }
-
-            // ALWAYS rebuild reply views if expanded to show latest like states
-            if (isExpanded) {
-                b.layoutReplies.removeAllViews()
-                buildReplyViews(replies)
-            }
-        }
-
-        private fun buildReplyViews(replies: List<Comment>) {
-            replies.forEach { r ->
-                val item = ItemCommentBinding.inflate(
-                    LayoutInflater.from(b.root.context),
-                    b.layoutReplies,
-                    false
-                )
-
-                // ✅ clear + load avatar for each reply
-                Glide.with(item.root)
-                    .clear(item.ivUserAvatar)
-
-                Glide.with(item.root)
-                    .load(r.userImage.ifEmpty { null })
-                    .placeholder(R.drawable.app_logo)
-                    .error(R.drawable.app_logo)
-                    .circleCrop()
-                    .diskCacheStrategy(DiskCacheStrategy.ALL)
-                    .into(item.ivUserAvatar)
-
-                item.tvUsername.text = r.username.ifEmpty { "user" }
-                item.tvTime.text     = getRelativeTime(r.createdAt)
-                item.tvCommentText.text = r.text
-
-                // Bind like state for reply
-                item.ivLikeComment.setImageResource(
-                    if (r.isLiked) R.drawable.ic_heart_filled
-                    else R.drawable.ic_heart_outline
-                )
-                item.ivLikeComment.imageTintList = if (r.isLiked)
-                    ColorStateList.valueOf(Color.RED)
-                else
-                    ColorStateList.valueOf(Color.parseColor("#999999"))
-
-                if (r.likesCount > 0) {
-                    item.tvCommentLikeCount.text = r.likesCount.toString()
-                    item.tvCommentLikeCount.visibility = View.VISIBLE
-                } else {
-                    item.tvCommentLikeCount.visibility = View.GONE
-                }
-
-                // Add like click listener with animation
-                item.ivLikeComment.setOnClickListener {
-                    animateLike(item.ivLikeComment, !r.isLiked)
-                    onLike(r)
-                }
-
-                // ✅ make reply avatar and username clickable
-                item.ivUserAvatar.setOnClickListener { onAvatar(r) }
-                item.tvUsername.setOnClickListener { onAvatar(r) }
-
-                b.layoutReplies.addView(item.root)
-            }
-        }
 
     }
 }

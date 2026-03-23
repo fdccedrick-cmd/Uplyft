@@ -43,6 +43,28 @@ class GalleryAdapter(
         return isMultiSelectMode
     }
 
+    // ✅ NEW: Reset multi-select state when returning to fragment
+    fun resetMultiSelect() {
+        isMultiSelectMode = false
+        selectedUris.clear()
+        selectedPosition = 1
+        notifyDataSetChanged()
+    }
+
+    // ✅ NEW: Explicitly enter multi-select mode
+    fun enterMultiSelectMode() {
+        isMultiSelectMode = true
+        selectedUris.clear()
+        notifyDataSetChanged()
+    }
+
+    // ✅ NEW: Explicitly exit multi-select mode
+    fun exitMultiSelectMode() {
+        isMultiSelectMode = false
+        selectedUris.clear()
+        notifyDataSetChanged()
+    }
+
     fun getSelectedUris(): List<Uri> = selectedUris.toList()
 
     override fun getItemCount() = images.size + 1

@@ -76,6 +76,13 @@ class CreatePostFragment : Fragment() {
                         }
                         is PostUploadState.Done -> {
                             binding.progressBar.visibility = View.GONE
+                            binding.tvShare.isEnabled      = true
+
+                            // ✅ Navigate back to home properly
+                            // Pop back stack to clear CreatePost from stack
+                            findNavController().popBackStack(R.id.selectImageFragment, inclusive = true)
+
+                            // Set bottom nav to home to ensure we're on home fragment
                             requireActivity()
                                 .findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(
                                     R.id.bottomNavigationView

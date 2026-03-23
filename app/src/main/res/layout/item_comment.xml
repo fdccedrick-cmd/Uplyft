@@ -127,14 +127,6 @@
                 android:gravity="center_vertical"
                 android:layout_marginTop="4dp">
 
-                <TextView
-                    android:id="@+id/tvReply"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Reply"
-                    android:textSize="11sp"
-                    android:textColor="#AAAAAA"
-                    android:textStyle="bold"/>
 
                 <TextView
                     android:id="@+id/tvLikesCount"

@@ -82,6 +82,18 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun incrementCommentCount(postId: String) {
+        viewModelScope.launch {
+            repository.incrementCommentCount(postId)
+        }
+    }
+
+    fun decrementCommentCount(postId: String) {
+        viewModelScope.launch {
+            repository.decrementCommentCount(postId)
+        }
+    }
+
     fun createPost(imageUris: List<Uri>, caption: String) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         viewModelScope.launch {

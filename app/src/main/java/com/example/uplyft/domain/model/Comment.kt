@@ -12,8 +12,6 @@ data class Comment(
     val isPending  : Boolean = false,
     val likesCount : Int     = 0,
     val isLiked    : Boolean = false,
-    val replyCount : Int     = 0,
-    val parentId   : String  = "",   // empty = top level, set = reply
     val mentions   : List<String> = emptyList(),
     val createdAt  : Long    = System.currentTimeMillis()
 )

@@ -20,6 +20,9 @@ interface PostDao {
     @Query("SELECT * FROM posts WHERE userId = :userId ORDER BY createdAt DESC")
     fun observeUserPosts(userId: String): Flow<List<PostEntity>>
 
+    @Query("SELECT * FROM posts WHERE postId = :postId LIMIT 1")
+    suspend fun getPostById(postId: String): PostEntity?
+
     @Query("UPDATE posts SET imageUrl = :url, isSynced = 1 WHERE postId = :postId")
     suspend fun updatePostUrl(postId: String, url: String)
 

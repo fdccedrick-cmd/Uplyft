@@ -144,10 +144,12 @@ class PostAdapter(
                 if (post.likesCount > 0) View.VISIBLE else View.GONE
 
             // ── Comments count ───────────────────────────────
-            binding.tvCommentsCount.text = when (post.commentsCount) {
-                0    -> "No comments yet"
-                1    -> "View 1 comment"
-                else -> "View all ${post.commentsCount} comments"
+            if (post.commentsCount > 0) {
+                binding.tvCommentsCount.text = post.commentsCount.toString()
+                binding.tvCommentsCount.visibility = View.VISIBLE
+            } else {
+                binding.tvCommentsCount.text = ""
+                binding.tvCommentsCount.visibility = View.GONE
             }
 
             // ── Like state ───────────────────────────────────
@@ -229,10 +231,9 @@ class PostAdapter(
         }
 
         private fun formatLikes(count: Int): String = when {
-            count >= 1_000_000 -> "${count / 1_000_000}M likes"
-            count >= 1_000     -> "${count / 1_000}K likes"
-            count == 1         -> "1 like"
-            else               -> "$count likes"
+            count >= 1_000_000 -> "${count / 1_000_000}M"
+            count >= 1_000     -> "${count / 1_000}K"
+            else               -> "$count"
         }
 
         private fun getRelativeTime(timestamp: Long): String {

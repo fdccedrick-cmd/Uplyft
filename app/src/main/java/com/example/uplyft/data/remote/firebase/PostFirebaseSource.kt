@@ -58,11 +58,15 @@ class PostFirebaseSource {
                     .exists()
             } else false
 
+            // Get comment count from Firestore document (fallback to 0 if not present)
+            val commentsCount = doc.getLong("commentsCount")?.toInt() ?: 0
+
             post.copy(
                 // fallback to fullName if username is empty
-                username     = username.ifEmpty { fullName },
-                userImageUrl = profileImageUrl,
-                isLiked      = isLiked
+                username      = username.ifEmpty { fullName },
+                userImageUrl  = profileImageUrl,
+                isLiked       = isLiked,
+                commentsCount = commentsCount
             )
         }
     }
@@ -94,7 +98,13 @@ class PostFirebaseSource {
                     .exists()
             } else false
 
-            post.copy(isLiked = isLiked)
+            // Get comment count from Firestore document (fallback to 0 if not present)
+            val commentsCount = doc.getLong("commentsCount")?.toInt() ?: 0
+
+            post.copy(
+                isLiked = isLiked,
+                commentsCount = commentsCount
+            )
         }
     }
 
@@ -118,7 +128,13 @@ class PostFirebaseSource {
                         .exists()
                 } else false
 
-                post.copy(isLiked = isLiked)
+                // Get comment count from Firestore document (fallback to 0 if not present)
+                val commentsCount = doc.getLong("commentsCount")?.toInt() ?: 0
+
+                post.copy(
+                    isLiked = isLiked,
+                    commentsCount = commentsCount
+                )
             }
 
         return posts.sortedByDescending { it.createdAt }   // ← sort after fetch

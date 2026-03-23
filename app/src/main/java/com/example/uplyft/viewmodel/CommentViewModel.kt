@@ -96,7 +96,7 @@ class CommentViewModel(application: Application) : AndroidViewModel(application)
 
     /* ================= ADD ================= */
 
-    fun addComment(postId: String, text: String, parentId: String = "") {
+    fun addComment(postId: String, text: String) {
         if (text.isBlank()) return
 
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
@@ -116,7 +116,6 @@ class CommentViewModel(application: Application) : AndroidViewModel(application)
                     username = user?.username?.ifEmpty { user.fullName } ?: "",
                     userImage = user?.profileImageUrl ?: "",
                     text = text.trim(),
-                    parentId = parentId,
                     isPending = true,
                     createdAt = System.currentTimeMillis()
                 )
@@ -131,6 +130,14 @@ class CommentViewModel(application: Application) : AndroidViewModel(application)
                 // remove temp
                 _comments.update { list ->
                     list.filterNot { it.commentId == tempId }
+                }
+
+                // ✅ Update Room cache immediately with new comment count
+                withContext(Dispatchers.IO) {
+                    val currentPost = db.postDao().getPostById(postId)
+                    if (currentPost != null) {
+                        db.postDao().updateCommentCount(postId, currentPost.commentsCount + 1)
+                    }
                 }
 
                 _addState.value = Resource.Success(saved)
@@ -173,6 +180,14 @@ class CommentViewModel(application: Application) : AndroidViewModel(application)
                 }
 
                 _comments.update { it.filterNot { c -> c.commentId == tempId } }
+
+                // ✅ Update Room cache immediately with new comment count
+                withContext(Dispatchers.IO) {
+                    val currentPost = db.postDao().getPostById(postId)
+                    if (currentPost != null) {
+                        db.postDao().updateCommentCount(postId, currentPost.commentsCount + 1)
+                    }
+                }
 
                 _addState.value = Resource.Success(saved)
 
@@ -264,6 +279,12 @@ class CommentViewModel(application: Application) : AndroidViewModel(application)
             try {
                 withContext(Dispatchers.IO) {
                     commentSource.deleteComment(postId, commentId)
+
+                    // ✅ Update Room cache immediately with decremented comment count
+                    val currentPost = db.postDao().getPostById(postId)
+                    if (currentPost != null && currentPost.commentsCount > 0) {
+                        db.postDao().updateCommentCount(postId, currentPost.commentsCount - 1)
+                    }
                 }
             } catch (_: Exception) {
             }

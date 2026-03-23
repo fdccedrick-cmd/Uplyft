@@ -143,14 +143,14 @@ class CommentsBottomSheet : BottomSheetDialogFragment() {
         val screenH = resources.displayMetrics.heightPixels
 
         sheetBehavior = BottomSheetBehavior.from(sheet).apply {
-            peekHeight        = screenH  // Show full screen at top
+            peekHeight        = (screenH * 0.65).toInt()  // 65% of screen initially
             maxHeight         = screenH
-            state             = BottomSheetBehavior.STATE_EXPANDED  // Start expanded at top
+            state             = BottomSheetBehavior.STATE_COLLAPSED  // Start at 65%
             skipCollapsed     = false
             isHideable        = true
-            isDraggable       = true
+            isDraggable       = true  // Allow dragging
             isFitToContents   = false
-            halfExpandedRatio = 0.5f
+            halfExpandedRatio = 0.65f
 
             addBottomSheetCallback(object : BottomSheetBehavior.BottomSheetCallback() {
                 override fun onStateChanged(bottomSheet: View, newState: Int) {

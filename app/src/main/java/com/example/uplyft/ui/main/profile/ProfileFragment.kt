@@ -38,6 +38,7 @@ import androidx.navigation.fragment.findNavController
 import androidx.lifecycle.ViewModelProvider
 import com.example.uplyft.utils.UserProfileState
 import com.google.android.material.tabs.TabLayout
+import com.example.uplyft.viewmodel.PostViewModel
 
 
 class ProfileFragment : Fragment() {
@@ -49,9 +50,11 @@ class ProfileFragment : Fragment() {
     private val profileViewModel: ProfileViewModel by viewModels {
         ViewModelProvider.AndroidViewModelFactory.getInstance(requireActivity().application)
     }
+    private val postViewModel   : PostViewModel    by activityViewModels()
 
     private lateinit var permissionManager  : PermissionManager
     private lateinit var profilePostAdapter : ProfilePostAdapter
+    private lateinit var savedPostAdapter   : ProfilePostAdapter
 
     private var currentUid    : String?  = null
     private var targetUserId  : String?  = null
@@ -119,9 +122,29 @@ class ProfileFragment : Fragment() {
                 )
             },
         )
+
+        savedPostAdapter = ProfilePostAdapter(
+            onPostClick = { post ->
+                val bundle = Bundle().apply {
+                    putString("postId", post.postId)
+                    putString("userId", post.userId)
+                }
+                findNavController().navigate(
+                    R.id.action_profileFragment_to_postDetailFragment,
+                    bundle
+                )
+            },
+        )
+
         binding.rvProfilePosts.apply {
             layoutManager = GridLayoutManager(requireContext(), 3)
             adapter       = profilePostAdapter
+            isNestedScrollingEnabled = false
+        }
+
+        binding.rvSavedPosts.apply {
+            layoutManager = GridLayoutManager(requireContext(), 3)
+            adapter       = savedPostAdapter
             isNestedScrollingEnabled = false
         }
     }
@@ -164,12 +187,19 @@ class ProfileFragment : Fragment() {
         if (_binding == null) return
         when (currentTab) {
             0 -> {
+                // Posts tab
                 binding.rvProfilePosts.visibility   = View.VISIBLE
+                binding.rvSavedPosts.visibility     = View.GONE
                 binding.layoutEmptySaved.visibility = View.GONE
             }
             1 -> {
+                // Saved posts tab
                 binding.rvProfilePosts.visibility   = View.GONE
-                binding.layoutEmptySaved.visibility = View.VISIBLE
+                binding.rvSavedPosts.visibility     = View.VISIBLE
+
+                // Show empty state if no saved posts
+                val hasSavedPosts = savedPostAdapter.itemCount > 0
+                binding.layoutEmptySaved.visibility = if (hasSavedPosts) View.GONE else View.VISIBLE
             }
         }
     }
@@ -180,10 +210,38 @@ class ProfileFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                profileViewModel.getUserPosts(uid).collect { posts ->
-                    if (_binding == null) return@collect
-                    profilePostAdapter.submitList(posts)
-                    binding.tvPostCount.text = posts.size.toString()
+                // Observe user's posts
+                launch {
+                    profileViewModel.getUserPosts(uid).collect { posts ->
+                        if (_binding == null) return@collect
+                        profilePostAdapter.submitList(posts)
+                        binding.tvPostCount.text = posts.size.toString()
+                    }
+                }
+
+                // Observe saved posts (only for own profile)
+                if (isOwnProfile) {
+                    launch {
+                        currentUid?.let { userId ->
+                            postViewModel.observeSavedPosts(userId).collect { savedPosts ->
+                                if (_binding == null) return@collect
+                                savedPostAdapter.submitList(savedPosts)
+
+                                // Update empty state visibility when on saved tab
+                                if (currentTab == 1) {
+                                    binding.layoutEmptySaved.visibility =
+                                        if (savedPosts.isEmpty()) View.VISIBLE else View.GONE
+                                }
+                            }
+                        }
+                    }
+
+                    // Sync saved posts from Firestore in background
+                    launch {
+                        currentUid?.let { userId ->
+                            postViewModel.syncSavedPostsFromFirestore(userId)
+                        }
+                    }
                 }
             }
         }

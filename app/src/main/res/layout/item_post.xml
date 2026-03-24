@@ -72,10 +72,22 @@
             android:id="@+id/vpPostImages"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            app:layout_constraintDimensionRatio="1:1"
-            app:layout_constraintTop_toBottomOf="@id/layoutPostHeader"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"/>
+
+        <!-- Transparent overlay for double tap gesture detection -->
+        <FrameLayout
+            android:id="@+id/doubleTapOverlay"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:clickable="true"
+            android:focusable="true"
+            app:layout_constraintTop_toTopOf="@id/vpPostImages"
+            app:layout_constraintBottom_toBottomOf="@id/vpPostImages"
+            app:layout_constraintStart_toStartOf="@id/vpPostImages"
+            app:layout_constraintEnd_toEndOf="@id/vpPostImages"/>
 
         <!-- dots indicator -->
         <com.tbuonomo.viewpagerdotsindicator.DotsIndicator
@@ -102,7 +114,7 @@
             android:paddingHorizontal="8dp"
             android:paddingVertical="3dp"
             android:visibility="gone"
-            app:layout_constraintTop_toBottomOf="@id/layoutPostHeader"
+            app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             android:layout_margin="10dp"/>
 
@@ -113,7 +125,7 @@
             android:layout_width="120dp"
             android:layout_height="120dp"
             android:src="@drawable/ic_heart_filled"
-            android:tint="#FFFFFF"
+            app:tint="#FFFFFF"
             android:alpha="0"
             android:visibility="gone"
             android:elevation="4dp"
@@ -208,6 +220,15 @@
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:layout_weight="1"/>
+
+        <!-- Save Button -->
+        <ImageView
+            android:id="@+id/ivSave"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_bookmark_outline"
+            app:tint="@color/on_background"
+            android:contentDescription="Save"/>
 
     </LinearLayout>
 

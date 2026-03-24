@@ -4,6 +4,8 @@ import android.net.Uri
 import android.util.Log
 import android.content.Context
 import com.example.uplyft.data.local.dao.PostDao
+import com.example.uplyft.data.local.dao.SavedPostDao
+import com.example.uplyft.data.local.AppDatabase
 import com.example.uplyft.data.local.entity.PostEntity
 import com.example.uplyft.data.local.entity.toDomain
 import com.example.uplyft.data.local.entity.toEntity
@@ -21,6 +23,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
@@ -39,6 +42,8 @@ class PostRepository(
     private val cloudinaryService: CloudinaryService
 ) {
 
+    private val db = AppDatabase.getInstance(context)
+    private val savedPostDao: SavedPostDao = db.savedPostDao()
     private val pendingLikeUpdates = mutableSetOf<String>()
     private val pendingCommentUpdates = mutableSetOf<String>()
 
@@ -47,14 +52,28 @@ class PostRepository(
     // ─────────────────────────────────────────────
 
     fun observePosts(): Flow<List<Post>> {
-        return postDao.observeAllPosts().map { entities ->
-            entities.map { it.toDomain() }
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+
+        return combine(
+            postDao.observeAllPosts(),
+            savedPostDao.observeSavedPostIds(currentUserId)
+        ) { postEntities, savedPostIds ->
+            postEntities.map { entity ->
+                entity.toDomain().copy(isSaved = savedPostIds.contains(entity.postId))
+            }
         }
     }
 
     fun observeUserPosts(userId: String): Flow<List<Post>> {
-        return postDao.observeUserPosts(userId).map { entities ->
-            entities.map { it.toDomain() }
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+
+        return combine(
+            postDao.observeUserPosts(userId),
+            savedPostDao.observeSavedPostIds(currentUserId)
+        ) { postEntities, savedPostIds ->
+            postEntities.map { entity ->
+                entity.toDomain().copy(isSaved = savedPostIds.contains(entity.postId))
+            }
         }
     }
 

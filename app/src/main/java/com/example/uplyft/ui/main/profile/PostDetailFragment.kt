@@ -7,7 +7,6 @@ import android.view.View
 import android.view.ViewGroup
 import com.example.uplyft.R
 import com.example.uplyft.databinding.FragmentPostDetailBinding
-import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.Lifecycle
@@ -18,13 +17,9 @@ import kotlinx.coroutines.launch
 import android.content.Intent
 import android.util.Log
 import android.widget.Toast
-import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.uplyft.ui.adapter.PostAdapter
-import com.example.uplyft.utils.Resource
-import com.example.uplyft.utils.UserProfileState
 import com.google.firebase.auth.FirebaseAuth
-import com.example.uplyft.ui.main.comments.CommentsBottomSheet
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import androidx.fragment.app.activityViewModels
@@ -64,10 +59,14 @@ class PostDetailFragment : Fragment() {
         postAdapter = PostAdapter(
             onLikeClick    = { post -> postViewModel.toggleLike(post) },
             onCommentClick = { post ->
-                CommentsBottomSheet.newInstance(post.postId)
-                    .show(childFragmentManager, CommentsBottomSheet.TAG)
+                val bundle = Bundle().apply { putString("postId", post.postId) }
+                findNavController().navigate(
+                    R.id.action_postDetailFragment_to_commentsFragment,
+                    bundle
+                )
             },
             onShareClick   = { post -> sharePost(post) },
+            onSaveClick    = { post -> postViewModel.toggleSavePost(post) },
             onProfileClick = { post ->
                 val currentUid = FirebaseAuth.getInstance().currentUser?.uid
                 if (post.userId == currentUid) {

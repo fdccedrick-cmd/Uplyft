@@ -416,6 +416,15 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:nestedScrollingEnabled="false"/>
+
+            <!-- Saved Posts Grid -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvSavedPosts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                android:nestedScrollingEnabled="false"/>
+
             <LinearLayout
                 android:id="@+id/layoutEmptySaved"
                 android:layout_width="match_parent"

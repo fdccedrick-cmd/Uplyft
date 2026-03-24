@@ -233,19 +233,7 @@
                     android:layout_marginEnd="4dp"
                     app:cornerRadius="8dp"/>
 
-                <Button
-                    android:id="@+id/btnMessage"
-                    android:layout_width="0dp"
-                    android:layout_height="60dp"
-                    android:layout_weight="1"
-                    android:text="Message"
-                    android:textAllCaps="false"
-                    android:textSize="13sp"
-                    android:textStyle="bold"
-                    android:backgroundTint="@color/surface"
-                    android:textColor="@color/on_background"
-                    android:layout_marginStart="4dp"
-                    app:cornerRadius="8dp"/>
+
 
             </LinearLayout>
 

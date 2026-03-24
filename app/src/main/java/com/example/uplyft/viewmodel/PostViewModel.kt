@@ -6,6 +6,7 @@ import com.example.uplyft.data.local.AppDatabase
 import com.example.uplyft.data.remote.cloudinary.CloudinaryService
 import com.example.uplyft.data.remote.firebase.PostFirebaseSource
 import com.example.uplyft.data.repository.PostRepository
+import com.example.uplyft.data.repository.SavedPostRepository
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
@@ -30,6 +31,8 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         firebaseSource    = PostFirebaseSource(),
         cloudinaryService = CloudinaryService(application.applicationContext)
     )
+
+    private val savedPostRepository = SavedPostRepository(db)
 
     // Feed from Room — auto-updates
     val posts: StateFlow<List<Post>> = repository
@@ -112,6 +115,31 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun getUserPosts(userId: String): Flow<List<Post>> {
         return repository.observeUserPosts(userId)
+    }
+
+    // ─────────────────────────────────────────────
+    // SAVE POST
+    // ─────────────────────────────────────────────
+
+    fun toggleSavePost(post: Post) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        viewModelScope.launch {
+            savedPostRepository.toggleSavePost(userId, post.postId)
+        }
+    }
+
+    fun observeSavedPosts(userId: String): Flow<List<Post>> {
+        return savedPostRepository.observeSavedPosts(userId)
+    }
+
+    fun syncSavedPostsFromFirestore(userId: String) {
+        viewModelScope.launch {
+            savedPostRepository.syncSavedPostsFromFirestore(userId)
+        }
+    }
+
+    suspend fun isPostSaved(userId: String, postId: String): Boolean {
+        return savedPostRepository.isPostSaved(userId, postId)
     }
 }
 

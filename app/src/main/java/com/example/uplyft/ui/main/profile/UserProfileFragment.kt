@@ -29,7 +29,6 @@ import com.example.uplyft.utils.PermissionManager
 import com.google.firebase.auth.FirebaseAuth
 import android.net.Uri
 import androidx.activity.result.contract.ActivityResultContracts
-import com.example.uplyft.ui.main.comments.CommentsBottomSheet
 import com.google.android.material.tabs.TabLayout
 import com.example.uplyft.viewmodel.ProfileViewModel
 

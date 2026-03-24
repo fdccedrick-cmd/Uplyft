@@ -46,6 +46,9 @@
         <action
             android:id="@+id/action_postDetailFragment_to_userProfileFragment"
             app:destination="@id/userProfileFragment"/>
+        <action
+            android:id="@+id/action_postDetailFragment_to_commentsFragment"
+            app:destination="@id/commentsFragment"/>
     </fragment>
 
     <fragment
@@ -58,6 +61,21 @@
         <action
             android:id="@+id/action_userProfileFragment_to_postDetailFragment"
             app:destination="@id/postDetailFragment"/>
+    </fragment>
+
+    <fragment
+        android:id="@+id/commentsFragment"
+        android:name="com.example.uplyft.ui.main.comments.CommentsFragment"
+        android:label="Comments">
+        <argument
+            android:name="postId"
+            app:argType="string"/>
+        <action
+            android:id="@+id/action_commentsFragment_to_userProfileFragment"
+            app:destination="@id/userProfileFragment"/>
+        <action
+            android:id="@+id/action_commentsFragment_to_profileFragment"
+            app:destination="@id/profileFragment"/>
     </fragment>
 
     <!-- ═══════════════════════════════════════════
@@ -74,6 +92,9 @@
         <action
             android:id="@+id/action_homeFragment_to_userProfileFragment"
             app:destination="@id/userProfileFragment"/>
+        <action
+            android:id="@+id/action_homeFragment_to_commentsFragment"
+            app:destination="@id/commentsFragment"/>
 
     </fragment>
 
@@ -97,6 +118,9 @@
         <action
             android:id="@+id/action_profileFragment_to_postDetailFragment"
             app:destination="@id/postDetailFragment"/>
+        <action
+            android:id="@+id/action_profileFragment_to_commentsFragment"
+            app:destination="@id/commentsFragment"/>
     </fragment>
 
     <fragment

@@ -6,7 +6,9 @@ import android.graphics.Typeface
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.style.StyleSpan
+import android.view.GestureDetector
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
@@ -24,7 +26,8 @@ class PostAdapter(
     private val onLikeClick    : (Post) -> Unit,
     private val onCommentClick : (Post) -> Unit,
     private val onShareClick   : (Post) -> Unit,
-    private val onProfileClick : (Post) -> Unit
+    private val onProfileClick : (Post) -> Unit,
+    private val onSaveClick    : (Post) -> Unit
 ) : RecyclerView.Adapter<PostAdapter.PostViewHolder>() {
 
     private val posts = mutableListOf<Post>()
@@ -155,6 +158,9 @@ class PostAdapter(
             // ── Like state ───────────────────────────────────
             bindLike(post)
 
+            // ── Save state ───────────────────────────────────
+            bindSave(post)
+
             // ── Click listeners ──────────────────────────────
             binding.ivLike.setOnClickListener {
                 animateLike(binding.ivLike)
@@ -163,24 +169,55 @@ class PostAdapter(
             binding.tvCommentsCount.setOnClickListener { onCommentClick(post) }
             binding.ivComment.setOnClickListener       { onCommentClick(post) }
             binding.ivShare.setOnClickListener         { onShareClick(post) }
+            binding.ivSave.setOnClickListener {
+                animateSave(binding.ivSave)
+                onSaveClick(post)
+            }
             binding.ivUserAvatar.setOnClickListener    { onProfileClick(post) }
             binding.tvUsername.setOnClickListener      { onProfileClick(post) }
 
             // ── Double tap to like ───────────────────────────
-            binding.vpPostImages.setOnClickListener(object : View.OnClickListener {
-                private var lastClick = 0L
-                override fun onClick(v: View) {
-                    val now = System.currentTimeMillis()
-                    if (now - lastClick < 300) {
+            setupDoubleTapLike(post)
+        }
+
+        private fun setupDoubleTapLike(post: Post) {
+            val gestureDetector = GestureDetector(
+                binding.root.context,
+                object : GestureDetector.SimpleOnGestureListener() {
+                    override fun onDoubleTap(e: MotionEvent): Boolean {
                         showHeartPopAnimation()
                         if (!post.isLiked) {
                             animateLike(binding.ivLike)
                             onLikeClick(post)
                         }
+                        return true
                     }
-                    lastClick = now
+
+                    override fun onDown(e: MotionEvent): Boolean {
+                        // Must return true to indicate we're interested in the gesture
+                        return true
+                    }
                 }
-            })
+            )
+
+            // Use the transparent overlay instead of ViewPager2
+            binding.doubleTapOverlay.setOnTouchListener { view, event ->
+                val gestureHandled = gestureDetector.onTouchEvent(event)
+
+                // If not a double tap, pass the event to ViewPager2 for swipe handling
+                if (!gestureHandled && event.action == MotionEvent.ACTION_DOWN) {
+                    // Let ViewPager2 handle the touch for swipe gestures
+                    binding.vpPostImages.dispatchTouchEvent(event)
+                    false
+                } else if (gestureHandled) {
+                    // Double tap detected, consume the event
+                    true
+                } else {
+                    // Pass all other events to ViewPager2
+                    binding.vpPostImages.dispatchTouchEvent(event)
+                    false
+                }
+            }
         }
 
         fun bindLike(post: Post) {
@@ -196,7 +233,25 @@ class PostAdapter(
                 )
         }
 
+        fun bindSave(post: Post) {
+            binding.ivSave.setImageResource(
+                if (post.isSaved) R.drawable.ic_bookmark_filled
+                else R.drawable.ic_bookmark_outline
+            )
+            binding.ivSave.imageTintList = ColorStateList.valueOf(
+                ContextCompat.getColor(binding.root.context, R.color.on_background)
+            )
+        }
+
         private fun animateLike(view: View) {
+            view.animate()
+                .scaleX(1.3f).scaleY(1.3f).setDuration(150)
+                .withEndAction {
+                    view.animate().scaleX(1f).scaleY(1f).setDuration(150).start()
+                }.start()
+        }
+
+        private fun animateSave(view: View) {
             view.animate()
                 .scaleX(1.3f).scaleY(1.3f).setDuration(150)
                 .withEndAction {

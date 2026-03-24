@@ -11,5 +11,6 @@ data class Post(
     val commentsCount: Int    = 0,
     val likesCount  : Int    = 0,
     val isLiked     : Boolean = false,   // ← add
+    val isSaved     : Boolean = false,   // ← add for saved posts
     val createdAt   : Long   = System.currentTimeMillis()
 )

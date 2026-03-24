@@ -7,7 +7,6 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.View
-import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -131,7 +130,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ─────────────────────────────────────────────
-    // NAVIGATION
+    // NAVIGATION - Instagram Style
     // ─────────────────────────────────────────────
 
     private fun setupNavigation() {
@@ -142,20 +141,21 @@ class MainActivity : AppCompatActivity() {
         binding.bottomNavigationView.setupWithNavController(navController)
         binding.bottomNavigationView.setOnItemReselectedListener { /* no-op */ }
 
-        val mainFragments = setOf(
+        // Define main tab destinations (root level)
+        val mainTabDestinations = setOf(
             R.id.homeFragment,
             R.id.searchFragment,
-            R.id.profileFragment
+            R.id.profileFragment,
+            R.id.notificationsFragment
         )
 
         navController.addOnDestinationChangedListener { _, destination, _ ->
-            if (destination.id in mainFragments) {
-                binding.bottomNavigationView.visibility = View.VISIBLE
-                binding.divider.visibility              = View.VISIBLE
-            } else {
-                binding.bottomNavigationView.visibility = View.GONE
-                binding.divider.visibility              = View.GONE
-            }
+            // Instagram-style: Show bottom nav only for root-level main tabs
+            // Hide for all secondary/detail screens (Comments, UserProfile, PostDetail, etc.)
+            val shouldShowBottomNav = destination.id in mainTabDestinations
+
+            binding.bottomNavigationView.visibility = if (shouldShowBottomNav) View.VISIBLE else View.GONE
+            binding.divider.visibility = if (shouldShowBottomNav) View.VISIBLE else View.GONE
         }
     }
 }

@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/light_background">
+
+    <!-- Toolbar Header -->
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/light_background"
+        android:elevation="0dp"
+        app:navigationIcon="@drawable/ic_back"
+        app:title="Comments"
+        app:titleTextColor="@color/on_background"
+        app:titleCentered="true"/>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.5dp"
+        android:background="@color/divider"/>
+
+    <!-- RecyclerView fills all space -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <com.example.uplyft.ui.widget.LockedRecyclerView
+            android:id="@+id/rvComments"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:overScrollMode="never"
+            android:clipToPadding="false"/>
+
+        <!-- Shimmer Loading Container with Animation -->
+        <com.facebook.shimmer.ShimmerFrameLayout
+            android:id="@+id/shimmerLoadingContainer"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="visible">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical">
+
+                <include layout="@layout/item_comment_shimmer"/>
+                <include layout="@layout/item_comment_shimmer"/>
+                <include layout="@layout/item_comment_shimmer"/>
+                <include layout="@layout/item_comment_shimmer"/>
+                <include layout="@layout/item_comment_shimmer"/>
+
+            </LinearLayout>
+
+        </com.facebook.shimmer.ShimmerFrameLayout>
+
+        <!-- Empty state -->
+        <LinearLayout
+            android:id="@+id/layoutEmptyState"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="top|center_horizontal"
+            android:paddingTop="80dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="No comments yet"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/on_background"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Start the conversation"
+                android:textSize="13sp"
+                android:textColor="#AAAAAA"
+                android:layout_marginTop="4dp"/>
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+    <!-- Include the comment input layout -->
+    <include layout="@layout/layout_comment_input"/>
+
+</LinearLayout>

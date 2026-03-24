@@ -1,11 +1,7 @@
 package com.example.uplyft.ui.auth
 
 import android.os.Bundle
-import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import com.example.uplyft.R
 import com.example.uplyft.databinding.ActivitySignupBinding
 import com.example.uplyft.ui.main.MainActivity
 import android.content.Intent
@@ -38,7 +34,8 @@ class SignupActivity : AppCompatActivity() {
             val fullName = binding.etFullName.text.toString().trim()
             val email    = binding.etEmail.text.toString().trim()
             val password = binding.etPassword.text.toString().trim()
-            if (!validateInputs(fullName, email, password)) return@setOnClickListener
+            val confirmPassword = binding.etConPassword.text.toString().trim()
+            if (!validateInputs(fullName, email, password, confirmPassword)) return@setOnClickListener
             viewModel.signup(email, password, fullName)
         }
 
@@ -71,21 +68,45 @@ class SignupActivity : AppCompatActivity() {
         }
     }
 
-    private fun validateInputs(fullName: String, email: String, password: String): Boolean {
+    private fun validateInputs(fullName: String, email: String, password: String, confirmPassword: String): Boolean {
+        // Clear previous errors
+        binding.tilPassword.error = null
+        binding.tilConfirmPassword.error = null
+
         if (fullName.isEmpty()) {
-            binding.etFullName.error = "Full name is required"; return false
+            binding.etFullName.error = "Full name is required"
+            binding.etFullName.requestFocus()
+            return false
         }
         if (email.isEmpty()) {
-            binding.etEmail.error = "Email is required"; return false
+            binding.etEmail.error = "Email is required"
+            binding.etEmail.requestFocus()
+            return false
         }
         if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            binding.etEmail.error = "Enter a valid email"; return false
+            binding.etEmail.error = "Enter a valid email"
+            binding.etEmail.requestFocus()
+            return false
         }
         if (password.isEmpty()) {
-            binding.etPassword.error = "Password is required"; return false
+            binding.tilPassword.error = "Password is required"
+            binding.etPassword.requestFocus()
+            return false
         }
         if (password.length < 6) {
-            binding.etPassword.error = "Min 6 characters"; return false
+            binding.tilPassword.error = "Min 6 characters"
+            binding.etPassword.requestFocus()
+            return false
+        }
+        if (confirmPassword.isEmpty()) {
+            binding.tilConfirmPassword.error = "Confirm password is required"
+            binding.etConPassword.requestFocus()
+            return false
+        }
+        if (password != confirmPassword) {
+            binding.tilConfirmPassword.error = "Passwords do not match"
+            binding.etConPassword.requestFocus()
+            return false
         }
         return true
     }

@@ -38,6 +38,7 @@ import android.text.Editable
 import android.text.TextWatcher
 
 
+
 class CommentsBottomSheet : BottomSheetDialogFragment() {
 
     private val viewModel: CommentViewModel by activityViewModels()

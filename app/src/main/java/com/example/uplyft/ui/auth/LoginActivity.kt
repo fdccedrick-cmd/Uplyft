@@ -1,11 +1,7 @@
 package com.example.uplyft.ui.auth
 
 import android.os.Bundle
-import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import com.example.uplyft.R
 import com.example.uplyft.databinding.ActivityLoginBinding
 import com.example.uplyft.ui.main.MainActivity
 import android.content.Intent
@@ -75,17 +71,28 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun validateInputs(email: String, password: String): Boolean {
+        // Clear previous errors
+        binding.tilPassword.error = null
+
         if (email.isEmpty()) {
-            binding.etEmail.error = "Email is required"; return false
+            binding.etEmail.error = "Email is required"
+            binding.etEmail.requestFocus()
+            return false
         }
         if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            binding.etEmail.error = "Enter a valid email"; return false
+            binding.etEmail.error = "Enter a valid email"
+            binding.etEmail.requestFocus()
+            return false
         }
         if (password.isEmpty()) {
-            binding.etPassword.error = "Password is required"; return false
+            binding.tilPassword.error = "Password is required"
+            binding.etPassword.requestFocus()
+            return false
         }
         if (password.length < 6) {
-            binding.etPassword.error = "Min 6 characters"; return false
+            binding.tilPassword.error = "Min 6 characters"
+            binding.etPassword.requestFocus()
+            return false
         }
         return true
     }

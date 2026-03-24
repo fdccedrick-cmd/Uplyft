@@ -30,7 +30,7 @@
         android:text="Welcome back"
         android:textSize="32sp"
         android:textStyle="bold"
-        android:textColor="@color/black"
+        android:textColor="@color/on_background"
         android:fontFamily="sans-serif-medium"
         android:layout_gravity="center_horizontal" />
 
@@ -39,7 +39,7 @@
         android:layout_height="wrap_content"
         android:text="Your daily momentum."
         android:textSize="16sp"
-        android:textColor="@color/text_gray"
+        android:textColor="@color/on_background"
         android:layout_marginTop="8dp"
         android:layout_marginBottom="48dp"
         android:layout_gravity="center_horizontal" />
@@ -48,37 +48,46 @@
     <EditText
         android:id="@+id/etEmail"
         android:layout_width="match_parent"
-        android:layout_height="60dp"
+        android:layout_height="50dp"
         android:hint="Email"
         android:inputType="textEmailAddress"
         android:background="@drawable/bg_input_field"
         android:paddingHorizontal="24dp"
         android:paddingVertical="16dp"
         android:textSize="16sp"
-        android:textColorHint="@color/text_gray"
+        android:textColorHint="@color/on_background"
         android:layout_marginBottom="16dp" />
 
     <!-- Password Field -->
-    <EditText
-        android:id="@+id/etPassword"
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilPassword"
         android:layout_width="match_parent"
-        android:layout_height="60dp"
-        android:hint="Password"
-        android:inputType="textPassword"
-        android:background="@drawable/bg_input_field"
-        android:paddingHorizontal="24dp"
-        android:paddingVertical="16dp"
-        android:textSize="16sp"
-        android:textColorHint="@color/text_gray"
-        android:layout_marginBottom="24dp" />
+        android:layout_height="wrap_content"
+        app:passwordToggleEnabled="true"
+        app:passwordToggleTint="@color/on_background"
+        app:boxBackgroundMode="none"
+        android:layout_marginBottom="24dp">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etPassword"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:hint="Password"
+            android:inputType="textPassword"
+            android:background="@drawable/bg_input_field"
+            android:paddingHorizontal="24dp"
+            android:paddingVertical="16dp"
+            android:textSize="16sp"
+            android:textColorHint="@color/on_background" />
+    </com.google.android.material.textfield.TextInputLayout>
 
     <!-- Login Button -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnLogin"
         android:layout_width="match_parent"
-        android:layout_height="60dp"
+        android:layout_height="50dp"
         android:text="Log in"
-        android:textSize="18sp"
+        android:textSize="16sp"
         android:textAllCaps="false"
         android:textColor="@color/white"
         app:backgroundTint="@color/orange"

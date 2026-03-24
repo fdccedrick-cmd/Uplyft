@@ -129,19 +129,23 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                     if (isOwn) false
                     else followSource.isFollowing(uid, currentUid)
                 }
-                val posts = withContext(Dispatchers.IO) {
-                    PostFirebaseSource().fetchUserPosts(uid, currentUserId = currentUid)
+
+                // ✅ FIX: Use repository method to fetch and cache user posts
+                withContext(Dispatchers.IO) {
+                    repository.refreshUserPosts(uid, currentUid)
                 }
 
-                // ✅ Update Room cache (user, posts, stats, follow state)
+                // Get posts from Room after caching
+                val posts = withContext(Dispatchers.IO) {
+                    db.postDao().getUserPosts(uid).map { it.toDomain() }
+                }
+
+                // ✅ Update Room cache (user, stats, follow state)
                 withContext(Dispatchers.IO) {
                     // Cache user info
                     db.userDao().insertUser(freshUser.toEntity())
 
-                    // ✅ Cache posts
-                    posts.forEach { post ->
-                        db.postDao().insertPost(post.toEntity())
-                    }
+                    // Posts already cached by refreshUserPosts above
 
                     // ✅ Cache user stats
                     db.userStatsDao().insertUserStats(

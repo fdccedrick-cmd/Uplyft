@@ -39,7 +39,7 @@ class NotificationFirebaseSource {
 
             Log.d("NotifSource", "Docs found: ${snapshot.documents.size}")
 
-            // ✅ manual mapping — toObject() silently fails on camelCase fields
+            // manual mapping — toObject() silently fails on camelCase fields
             snapshot.documents.mapNotNull { doc ->
                 try {
                     Notification(

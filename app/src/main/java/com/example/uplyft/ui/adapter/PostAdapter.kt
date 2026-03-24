@@ -6,9 +6,7 @@ import android.graphics.Typeface
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.style.StyleSpan
-import android.view.GestureDetector
 import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
@@ -27,10 +25,17 @@ class PostAdapter(
     private val onCommentClick : (Post) -> Unit,
     private val onShareClick   : (Post) -> Unit,
     private val onProfileClick : (Post) -> Unit,
-    private val onSaveClick    : (Post) -> Unit
-) : RecyclerView.Adapter<PostAdapter.PostViewHolder>() {
+    private val onSaveClick    : (Post) -> Unit,
+    private val onRetryClick   : (Post) -> Unit
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private val posts = mutableListOf<Post>()
+    private var isLoadingMore = false
+
+    companion object {
+        private const val VIEW_TYPE_POST = 0
+        private const val VIEW_TYPE_LOADING = 1
+    }
 
     fun submitList(newPosts: List<Post>) {
         val diff = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
@@ -46,36 +51,46 @@ class PostAdapter(
         diff.dispatchUpdatesTo(this)
     }
 
-    fun updateLike(postId: String, liked: Boolean, newCount: Int) {
-        val index = posts.indexOfFirst { it.postId == postId }
-        if (index != -1) {
-            posts[index] = posts[index].copy(likesCount = newCount)
-            notifyItemChanged(index, "like_payload")
+    fun showLoading() {
+        if (!isLoadingMore) {
+            isLoadingMore = true
+            notifyItemInserted(posts.size)
         }
     }
 
-    override fun getItemCount() = posts.size
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PostViewHolder {
-        val binding = ItemPostBinding.inflate(
-            LayoutInflater.from(parent.context), parent, false
-        )
-        return PostViewHolder(binding)
+    fun hideLoading() {
+        if (isLoadingMore) {
+            isLoadingMore = false
+            notifyItemRemoved(posts.size)
+        }
     }
 
-    override fun onBindViewHolder(holder: PostViewHolder, position: Int) {
-        holder.bind(posts[position])
+    override fun getItemViewType(position: Int): Int {
+        return if (position < posts.size) VIEW_TYPE_POST else VIEW_TYPE_LOADING
     }
 
-    override fun onBindViewHolder(
-        holder: PostViewHolder,
-        position: Int,
-        payloads: MutableList<Any>
-    ) {
-        if (payloads.contains("like_payload")) {
-            holder.bindLike(posts[position])
-        } else {
-            super.onBindViewHolder(holder, position, payloads)
+    override fun getItemCount(): Int = posts.size + if (isLoadingMore) 1 else 0
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        return when (viewType) {
+            VIEW_TYPE_POST -> {
+                val binding = ItemPostBinding.inflate(
+                    LayoutInflater.from(parent.context), parent, false
+                )
+                PostViewHolder(binding)
+            }
+            VIEW_TYPE_LOADING -> {
+                val view = LayoutInflater.from(parent.context)
+                    .inflate(R.layout.item_loading, parent, false)
+                LoadingViewHolder(view)
+            }
+            else -> throw IllegalArgumentException("Unknown view type")
+        }
+    }
+
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        if (holder is PostViewHolder && position < posts.size) {
+            holder.bind(posts[position])
         }
     }
 
@@ -83,7 +98,7 @@ class PostAdapter(
         private val binding: ItemPostBinding
     ) : RecyclerView.ViewHolder(binding.root) {
 
-        // ✅ single clean bind — handles both single and multiple images
+        // single clean bind — handles both single and multiple images
         fun bind(post: Post) {
 
             // ── Avatar ──────────────────────────────────────
@@ -109,13 +124,17 @@ class PostAdapter(
             if (urls.size > 1) {
                 binding.dotsIndicator.visibility = View.VISIBLE
                 binding.tvImageCount.visibility  = View.VISIBLE
-                binding.tvImageCount.text        = "1/${urls.size}"
+                binding.tvImageCount.text = binding.root.context.getString(
+                    R.string.image_count_format, 1, urls.size
+                )
                 binding.dotsIndicator.attachTo(binding.vpPostImages)
 
                 binding.vpPostImages.registerOnPageChangeCallback(
                     object : ViewPager2.OnPageChangeCallback() {
                         override fun onPageSelected(pos: Int) {
-                            binding.tvImageCount.text = "${pos + 1}/${urls.size}"
+                            binding.tvImageCount.text = binding.root.context.getString(
+                                R.string.image_count_format, pos + 1, urls.size
+                            )
                         }
                     }
                 )
@@ -161,6 +180,9 @@ class PostAdapter(
             // ── Save state ───────────────────────────────────
             bindSave(post)
 
+            // ── Upload status ────────────────────────────────
+            bindUploadStatus(post)
+
             // ── Click listeners ──────────────────────────────
             binding.ivLike.setOnClickListener {
                 animateLike(binding.ivLike)
@@ -175,49 +197,6 @@ class PostAdapter(
             }
             binding.ivUserAvatar.setOnClickListener    { onProfileClick(post) }
             binding.tvUsername.setOnClickListener      { onProfileClick(post) }
-
-            // ── Double tap to like ───────────────────────────
-            setupDoubleTapLike(post)
-        }
-
-        private fun setupDoubleTapLike(post: Post) {
-            val gestureDetector = GestureDetector(
-                binding.root.context,
-                object : GestureDetector.SimpleOnGestureListener() {
-                    override fun onDoubleTap(e: MotionEvent): Boolean {
-                        showHeartPopAnimation()
-                        if (!post.isLiked) {
-                            animateLike(binding.ivLike)
-                            onLikeClick(post)
-                        }
-                        return true
-                    }
-
-                    override fun onDown(e: MotionEvent): Boolean {
-                        // Must return true to indicate we're interested in the gesture
-                        return true
-                    }
-                }
-            )
-
-            // Use the transparent overlay instead of ViewPager2
-            binding.doubleTapOverlay.setOnTouchListener { view, event ->
-                val gestureHandled = gestureDetector.onTouchEvent(event)
-
-                // If not a double tap, pass the event to ViewPager2 for swipe handling
-                if (!gestureHandled && event.action == MotionEvent.ACTION_DOWN) {
-                    // Let ViewPager2 handle the touch for swipe gestures
-                    binding.vpPostImages.dispatchTouchEvent(event)
-                    false
-                } else if (gestureHandled) {
-                    // Double tap detected, consume the event
-                    true
-                } else {
-                    // Pass all other events to ViewPager2
-                    binding.vpPostImages.dispatchTouchEvent(event)
-                    false
-                }
-            }
         }
 
         fun bindLike(post: Post) {
@@ -243,6 +222,69 @@ class PostAdapter(
             )
         }
 
+        fun bindUploadStatus(post: Post) {
+            android.util.Log.d("PostAdapter", "bindUploadStatus: postId=${post.postId}, uploadStatus=${post.uploadStatus}")
+
+            when (post.uploadStatus) {
+                "pending", "uploading" -> {
+                    // Show gray overlay with progress
+                    binding.uploadStatusOverlay.visibility = View.VISIBLE
+                    binding.uploadStatusOverlay.isClickable = false
+                    binding.uploadProgressBar.visibility = View.VISIBLE
+                    binding.tvUploadStatus.text = if (post.uploadStatus == "pending") "Pending..." else "Uploading..."
+                    binding.btnRetry.visibility = View.GONE
+
+                    // Disable interactions
+                    binding.ivLike.isEnabled = false
+                    binding.ivComment.isEnabled = false
+                    binding.ivShare.isEnabled = false
+                    binding.ivSave.isEnabled = false
+
+                    // Add gray tint to entire post
+                    binding.root.alpha = 0.6f
+                }
+                "failed" -> {
+                    // Show gray overlay with retry button
+                    binding.uploadStatusOverlay.visibility = View.VISIBLE
+                    binding.uploadStatusOverlay.isClickable = true
+                    binding.uploadStatusOverlay.isFocusable = true
+                    binding.uploadProgressBar.visibility = View.GONE
+                    binding.tvUploadStatus.text = "Upload failed"
+                    binding.btnRetry.visibility = View.VISIBLE
+
+                    android.util.Log.d("PostAdapter", "Setting retry click for postId=${post.postId}")
+
+                    // Setup retry click
+                    binding.uploadStatusOverlay.setOnClickListener {
+                        android.util.Log.d("PostAdapter", "Retry clicked for postId=${post.postId}")
+                        onRetryClick(post)
+                    }
+                    binding.btnRetry.setOnClickListener {
+                        android.util.Log.d("PostAdapter", "Retry button clicked for postId=${post.postId}")
+                        onRetryClick(post)
+                    }
+
+                    // Disable other interactions
+                    binding.ivLike.isEnabled = false
+                    binding.ivComment.isEnabled = false
+                    binding.ivShare.isEnabled = false
+                    binding.ivSave.isEnabled = false
+
+                    binding.root.alpha = 0.6f
+                }
+                else -> { // "synced" or any other status
+                    // Hide overlay, enable interactions
+                    binding.uploadStatusOverlay.visibility = View.GONE
+                    binding.uploadStatusOverlay.isClickable = false
+                    binding.ivLike.isEnabled = true
+                    binding.ivComment.isEnabled = true
+                    binding.ivShare.isEnabled = true
+                    binding.ivSave.isEnabled = true
+                    binding.root.alpha = 1.0f
+                }
+            }
+        }
+
         private fun animateLike(view: View) {
             view.animate()
                 .scaleX(1.3f).scaleY(1.3f).setDuration(150)
@@ -257,32 +299,6 @@ class PostAdapter(
                 .withEndAction {
                     view.animate().scaleX(1f).scaleY(1f).setDuration(150).start()
                 }.start()
-        }
-
-        private fun showHeartPopAnimation() {
-            binding.ivHeartOverlay.apply {
-                visibility = View.VISIBLE
-                alpha      = 0f
-                scaleX     = 0f
-                scaleY     = 0f
-                animate()
-                    .alpha(1f).scaleX(1.2f).scaleY(1.2f)
-                    .setDuration(250)
-                    .setInterpolator(android.view.animation.OvershootInterpolator(2f))
-                    .withEndAction {
-                        animate()
-                            .scaleX(1f).scaleY(1f).setDuration(150)
-                            .setInterpolator(android.view.animation.DecelerateInterpolator())
-                            .withEndAction {
-                                animate()
-                                    .alpha(0f).scaleX(1.2f).scaleY(1.2f)
-                                    .setDuration(250).setStartDelay(100)
-                                    .setInterpolator(android.view.animation.AccelerateInterpolator())
-                                    .withEndAction { visibility = View.GONE }
-                                    .start()
-                            }.start()
-                    }.start()
-            }
         }
 
         private fun formatLikes(count: Int): String = when {
@@ -302,4 +318,11 @@ class PostAdapter(
             }
         }
     }
+
+    // ─────────────────────────────────────────────
+    // LOADING VIEW HOLDER
+    // ─────────────────────────────────────────────
+
+    class LoadingViewHolder(view: View) : RecyclerView.ViewHolder(view)
 }
+

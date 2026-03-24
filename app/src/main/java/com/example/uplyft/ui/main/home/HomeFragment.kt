@@ -26,6 +26,11 @@ import android.widget.Toast
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.firebase.auth.FirebaseAuth
 import com.example.uplyft.viewmodel.NotificationViewModel
+import com.example.uplyft.utils.NetworkUtils
+import androidx.appcompat.app.AlertDialog
+import com.example.uplyft.utils.SeedData
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 
 class HomeFragment : Fragment() {
@@ -75,7 +80,11 @@ class HomeFragment : Fragment() {
         setupClickListeners()
         observeFeedState()
         observePosts()
+        observeLoadingState()
         setupSwipeRefresh()
+
+        // Check network on view created
+        checkNetworkAndShowDialog()
 
         parentFragmentManager.setFragmentResultListener(
             "navigate_to_profile",
@@ -110,6 +119,7 @@ class HomeFragment : Fragment() {
             },
             onShareClick   = { post -> sharePost(post) },
             onSaveClick    = { post -> postViewModel.toggleSavePost(post) },
+            onRetryClick   = { post -> postViewModel.retryUpload(post) },
             onProfileClick = { post ->
                 val currentUid = FirebaseAuth.getInstance().currentUser?.uid
                 if (post.userId == currentUid) {
@@ -143,14 +153,24 @@ class HomeFragment : Fragment() {
                             Glide.with(this@HomeFragment).pauseRequests()
                     }
                 }
-                // Pagination — load more when near bottom
-                override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
-                    if (dy <= 0) return   // only trigger on downward scroll
-                    val visible    = layoutManager.childCount
-                    val total      = layoutManager.itemCount
-                    val firstVisible = layoutManager.findFirstVisibleItemPosition()
-                    if (visible + firstVisible >= total - 3) {
-                        postViewModel.loadMorePosts()
+
+                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                    super.onScrolled(recyclerView, dx, dy)
+
+                    // Pagination: Load more when near bottom
+                    if (dy > 0) { // Scrolling down
+                        val visibleItemCount = layoutManager.childCount
+                        val totalItemCount = layoutManager.itemCount
+                        val firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition()
+
+                        // Load more when 3 items from bottom
+                        if ((visibleItemCount + firstVisibleItemPosition) >= totalItemCount - 3
+                            && firstVisibleItemPosition >= 0) {
+                            // Only load if network is available
+                            if (NetworkUtils.isNetworkAvailable(requireContext())) {
+                                postViewModel.loadMorePosts()
+                            }
+                        }
                     }
                 }
             })
@@ -161,6 +181,71 @@ class HomeFragment : Fragment() {
         binding.ivAddPost.setOnClickListener {
             findNavController().navigate(R.id.selectImageFragment)
         }
+
+        //DEBUG: Long press to show seed menu
+        binding.ivAddPost.setOnLongClickListener {
+            showSeedMenu()
+            true
+        }
+    }
+
+    private fun showSeedMenu() {
+        AlertDialog.Builder(requireContext())
+            .setTitle("🔧 Debug Menu")
+            .setMessage("Choose an action for testing:")
+            .setPositiveButton("Seed 50 Posts") { _, _ ->
+                seedPosts()
+            }
+            .setNegativeButton("Delete All My Posts") { _, _ ->
+                deleteAllPosts()
+            }
+            .setNeutralButton("Cancel", null)
+            .show()
+    }
+
+    private fun seedPosts() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                Toast.makeText(requireContext(), "Seeding 50 posts...", Toast.LENGTH_SHORT).show()
+
+                withContext(Dispatchers.IO) {
+                    SeedData.seedPosts()
+                }
+
+                Toast.makeText(requireContext(), "✅ Seeded 50 posts! Pull to refresh.", Toast.LENGTH_LONG).show()
+
+                // Auto refresh
+                postViewModel.loadFeed()
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "❌ Seed failed: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun deleteAllPosts() {
+        AlertDialog.Builder(requireContext())
+            .setTitle("Delete All Posts?")
+            .setMessage("This will permanently delete all your posts from Firestore.")
+            .setPositiveButton("Delete") { _, _ ->
+                viewLifecycleOwner.lifecycleScope.launch {
+                    try {
+                        Toast.makeText(requireContext(), "Deleting posts...", Toast.LENGTH_SHORT).show()
+
+                        withContext(Dispatchers.IO) {
+                            SeedData.deleteAllMyPosts()
+                        }
+
+                        Toast.makeText(requireContext(), "✅ Deleted all posts! Pull to refresh.", Toast.LENGTH_LONG).show()
+
+                        // Auto refresh
+                        postViewModel.loadFeed()
+                    } catch (e: Exception) {
+                        Toast.makeText(requireContext(), "❌ Delete failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun observeFeedState() {
@@ -208,12 +293,42 @@ class HomeFragment : Fragment() {
         }
     }
 
+    private fun observeLoadingState() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                postViewModel.isLoadingMore.collect { isLoading ->
+                    if (isLoading) {
+                        postAdapter.showLoading()
+                    } else {
+                        postAdapter.hideLoading()
+                    }
+                }
+            }
+        }
+    }
+
     private fun sharePost(post: Post) {
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_TEXT, "Check out this post on Uplyft! ${post.imageUrl}")
         }
         startActivity(Intent.createChooser(intent, "Share via"))
+    }
+
+    private fun checkNetworkAndShowDialog() {
+        if (!NetworkUtils.isNetworkAvailable(requireContext())) {
+            AlertDialog.Builder(requireContext())
+                .setTitle("No Internet Connection")
+                .setMessage("Cellular data is turned off. You're viewing cached posts only.")
+                .setPositiveButton("OK", null)
+                .show()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Check network when fragment resumes
+        checkNetworkAndShowDialog()
     }
 
     override fun onDestroyView() {

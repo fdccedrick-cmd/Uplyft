@@ -4,6 +4,7 @@ package com.example.uplyft.utils
 
 import android.Manifest
 import android.app.AlertDialog
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -23,6 +24,13 @@ class PermissionManager(private val fragment: Fragment) {
             Manifest.permission.READ_EXTERNAL_STORAGE
 
         val CAMERA_PERMISSION = Manifest.permission.CAMERA
+        val NOTIFICATION_PERMISSION = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            Manifest.permission.POST_NOTIFICATIONS
+        else
+            null
+
+        private const val PREF_NAME = "permission_denials"
+        private const val MAX_DENIALS = 2
     }
 
     private var onGranted: (() -> Unit)? = null
@@ -30,17 +38,32 @@ class PermissionManager(private val fragment: Fragment) {
     private var onPermanentlyDenied: (() -> Unit)? = null
     private var lastRequestedPermission: String = ""
 
+    private val prefs = fragment.requireContext()
+        .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+
     private val singlePermissionLauncher = fragment.registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
+            // Reset denial count on grant
+            resetDenialCount(lastRequestedPermission)
             onGranted?.invoke()
         } else {
+            // Increment denial count
+            val denialCount = incrementDenialCount(lastRequestedPermission)
+
             val shouldShow = fragment.shouldShowRequestPermissionRationale(
                 lastRequestedPermission
             )
-            if (shouldShow) onDenied?.invoke()
-            else onPermanentlyDenied?.invoke()
+
+            if (denialCount >= MAX_DENIALS) {
+                // After 2 denials, show settings dialog
+                showSettingsDialog(getPermissionName(lastRequestedPermission))
+            } else if (shouldShow) {
+                onDenied?.invoke()
+            } else {
+                onPermanentlyDenied?.invoke()
+            }
         }
     }
 
@@ -109,6 +132,34 @@ class PermissionManager(private val fragment: Fragment) {
         onDenied
     )
 
+    // ─────────────────────────────────────────────
+    // DENIAL COUNT TRACKING
+    // ─────────────────────────────────────────────
+
+    private fun getDenialCount(permission: String): Int {
+        return prefs.getInt("denial_$permission", 0)
+    }
+
+    private fun incrementDenialCount(permission: String): Int {
+        val currentCount = getDenialCount(permission)
+        val newCount = currentCount + 1
+        prefs.edit().putInt("denial_$permission", newCount).apply()
+        return newCount
+    }
+
+    private fun resetDenialCount(permission: String) {
+        prefs.edit().putInt("denial_$permission", 0).apply()
+    }
+
+    private fun getPermissionName(permission: String): String {
+        return when (permission) {
+            CAMERA_PERMISSION -> "Camera"
+            GALLERY_PERMISSION -> "Gallery"
+            NOTIFICATION_PERMISSION -> "Notifications"
+            else -> "This"
+        }
+    }
+
     private fun showDeniedToast() {
         Toast.makeText(
             fragment.requireContext(),
@@ -117,12 +168,13 @@ class PermissionManager(private val fragment: Fragment) {
         ).show()
     }
 
-    private fun showSettingsDialog() {
+    private fun showSettingsDialog(permissionName: String = "This") {
         AlertDialog.Builder(fragment.requireContext())
-            .setTitle("Permission Required")
-            .setMessage("This permission was permanently denied. Enable it in Settings to continue.")
+            .setTitle("$permissionName Permission Required")
+            .setMessage("You've denied this permission multiple times. Please enable $permissionName permission in Settings to use this feature.")
             .setPositiveButton("Open Settings") { _, _ -> openAppSettings() }
             .setNegativeButton("Cancel", null)
+            .setCancelable(false)
             .show()
     }
 

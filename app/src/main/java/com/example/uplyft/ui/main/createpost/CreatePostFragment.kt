@@ -57,7 +57,14 @@ class CreatePostFragment : Fragment() {
         binding.tvShare.setOnClickListener {
             val caption = binding.etCaption.text.toString().trim()
             if (imageUris.isEmpty()) return@setOnClickListener
+
+            // Start upload process
             postViewModel.createPost(imageUris, caption)
+
+            findNavController().popBackStack(R.id.selectImageFragment, true)
+            requireActivity()
+                .findViewById<BottomNavigationView>(R.id.bottomNavigationView)
+                ?.selectedItemId = R.id.homeFragment
         }
 
         observeUploadState()
@@ -68,38 +75,20 @@ class CreatePostFragment : Fragment() {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 postViewModel.uploadState.collect { state ->
                     when (state) {
-                        is PostUploadState.Saving,
-                        is PostUploadState.Uploading,
-                        is PostUploadState.Syncing -> {
-                            binding.progressBar.visibility = View.VISIBLE
-                            binding.tvShare.isEnabled      = false
-                        }
-                        is PostUploadState.Done -> {
-                            binding.progressBar.visibility = View.GONE
-                            binding.tvShare.isEnabled      = true
-
-                            // ✅ Navigate back to home properly
-                            // Pop back stack to clear CreatePost from stack
-                            findNavController().popBackStack(R.id.selectImageFragment, inclusive = true)
-
-                            // Set bottom nav to home to ensure we're on home fragment
-                            requireActivity()
-                                .findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(
-                                    R.id.bottomNavigationView
-                                ).selectedItemId = R.id.homeFragment
-                        }
                         is PostUploadState.Error -> {
-                            binding.progressBar.visibility = View.GONE
-                            binding.tvShare.isEnabled      = true
+                            // Show toast for error (user is now on home feed)
                             Toast.makeText(requireContext(),
-                                state.message, Toast.LENGTH_SHORT).show()
+                                "Upload failed - Tap post to retry",
+                                Toast.LENGTH_LONG).show()
                         }
-                        null -> Unit
+                        else -> Unit
                     }
                 }
             }
         }
     }
+
+
 
     override fun onDestroyView() {
         super.onDestroyView()

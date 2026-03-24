@@ -33,7 +33,6 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
     private var notifListener   : ListenerRegistration? = null
 
     fun startListeningNotifications(userId: String) {
-        // Don't recreate listener if already listening
         if (notifListener != null) return
 
         _isLoading.value = true
@@ -70,7 +69,6 @@ class NotificationViewModel(application: Application) : AndroidViewModel(applica
             }
     }
     fun startListeningUnreadCount(userId: String) {
-        // Don't recreate listener if already listening
         if (unreadListener != null) return
 
         unreadListener = db.collection("notifications")

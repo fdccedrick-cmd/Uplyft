@@ -55,7 +55,6 @@ class NotificationAdapter(
         private var followListener: ListenerRegistration? = null
 
         fun bind(notif: Notification) {
-            // Clean up any existing listener for this ViewHolder
             followListener?.remove()
             followListener = null
 

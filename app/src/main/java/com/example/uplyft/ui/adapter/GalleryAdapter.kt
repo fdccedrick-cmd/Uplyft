@@ -35,15 +35,7 @@ class GalleryAdapter(
         images.addAll(uris)
         notifyDataSetChanged()
     }
-
-    fun toggleMultiSelect(): Boolean {
-        isMultiSelectMode = !isMultiSelectMode
-        if (!isMultiSelectMode) selectedUris.clear()
-        notifyDataSetChanged()
-        return isMultiSelectMode
-    }
-
-    // ✅ NEW: Reset multi-select state when returning to fragment
+    //  Reset multi-select state when returning to fragment
     fun resetMultiSelect() {
         isMultiSelectMode = false
         selectedUris.clear()
@@ -51,14 +43,14 @@ class GalleryAdapter(
         notifyDataSetChanged()
     }
 
-    // ✅ NEW: Explicitly enter multi-select mode
+    // Explicitly enter multi-select mode
     fun enterMultiSelectMode() {
         isMultiSelectMode = true
         selectedUris.clear()
         notifyDataSetChanged()
     }
 
-    // ✅ NEW: Explicitly exit multi-select mode
+    // Explicitly exit multi-select mode
     fun exitMultiSelectMode() {
         isMultiSelectMode = false
         selectedUris.clear()

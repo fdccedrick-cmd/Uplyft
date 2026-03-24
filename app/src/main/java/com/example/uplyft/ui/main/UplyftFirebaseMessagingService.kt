@@ -1,13 +1,16 @@
 package com.example.uplyft.ui.main
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.example.uplyft.R
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -51,7 +54,7 @@ class UplyftFirebaseMessagingService : FirebaseMessagingService() {
                 .createNotificationChannel(channel)
         }
 
-        // ✅ pass all navigation data in intent
+        // pass all navigation data in intent
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra("type",      type)
@@ -74,8 +77,17 @@ class UplyftFirebaseMessagingService : FirebaseMessagingService() {
             .setContentIntent(pendingIntent)
             .build()
 
-        NotificationManagerCompat.from(this)
-            .notify(System.currentTimeMillis().toInt(), notification)
+        // Check permission before showing notification (Android 13+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED) {
+                NotificationManagerCompat.from(this)
+                    .notify(System.currentTimeMillis().toInt(), notification)
+            }
+        } else {
+            NotificationManagerCompat.from(this)
+                .notify(System.currentTimeMillis().toInt(), notification)
+        }
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
@@ -88,7 +100,7 @@ class UplyftFirebaseMessagingService : FirebaseMessagingService() {
         val fromUser  = message.data["fromUserId"] ?: ""
         val commentId = message.data["commentId"]  ?: ""
 
-        // ✅ pass fromUser to showNotification
+        // pass fromUser to showNotification
         showNotification(title, body, type, postId, fromUser, commentId)
     }
 }

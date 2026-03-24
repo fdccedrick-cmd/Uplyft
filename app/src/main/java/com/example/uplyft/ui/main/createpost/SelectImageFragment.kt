@@ -16,8 +16,6 @@ import android.os.Build
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
-import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.GridLayoutManager
@@ -32,8 +30,6 @@ import java.lang.Exception
 import java.util.UUID
 import android.content.Context
 
-
-// ui/main/createpost/SelectImageFragment.kt
 class SelectImageFragment : Fragment() {
 
     private var _binding: FragmentSelectImageBinding? = null
@@ -70,7 +66,6 @@ class SelectImageFragment : Fragment() {
         permissionManager = PermissionManager(this)
         setupGalleryGrid()
 
-        // ✅ Reset multi-select state when returning to fragment
         isMultiMode = false
         galleryAdapter.resetMultiSelect()
 
@@ -82,8 +77,6 @@ class SelectImageFragment : Fragment() {
         binding.ivClose.setOnClickListener {
             findNavController().popBackStack()
         }
-
-        // ✅ toggle multi-select
         binding.tvSelect.setOnClickListener {
             isMultiMode = !isMultiMode
 

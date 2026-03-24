@@ -9,6 +9,5 @@ object Constants {
     const val CLOUDINARY_API_SECRET = "lw6bTo96rQHglAJq0g2G-4NjhEw"
 
     const val FOLLOWS_COLLECTION = "follows"
-    const val GIPHY_API_KEY = "Y3rp6zM46Tp9WY3Ec7ovadc48OCbpKPq"
 
 }

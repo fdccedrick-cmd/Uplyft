@@ -133,7 +133,7 @@ class NotificationsFragment : Fragment() {
     }
 
     private fun handleNotifClick(notif: Notification) {
-        // ✅ mark single notif as read on tap
+        // mark single notif as read on tap
         viewModel.markSingleRead(notif.id, currentUid)
 
         when (notif.type) {

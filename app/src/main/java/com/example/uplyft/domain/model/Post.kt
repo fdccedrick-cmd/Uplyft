@@ -12,5 +12,6 @@ data class Post(
     val likesCount  : Int    = 0,
     val isLiked     : Boolean = false,   // ← add
     val isSaved     : Boolean = false,   // ← add for saved posts
+    val uploadStatus: String  = "synced", // "pending", "uploading", "failed", "synced"
     val createdAt   : Long   = System.currentTimeMillis()
 )

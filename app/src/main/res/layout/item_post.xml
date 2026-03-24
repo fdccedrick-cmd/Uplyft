@@ -82,8 +82,8 @@
             android:id="@+id/doubleTapOverlay"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            android:clickable="true"
-            android:focusable="true"
+            android:clickable="false"
+            android:focusable="false"
             app:layout_constraintTop_toTopOf="@id/vpPostImages"
             app:layout_constraintBottom_toBottomOf="@id/vpPostImages"
             app:layout_constraintStart_toStartOf="@id/vpPostImages"
@@ -134,6 +134,59 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             android:contentDescription="Like animation"/>
+
+        <!-- Upload Status Overlay (Gray overlay for pending/uploading/failed posts) -->
+        <FrameLayout
+            android:id="@+id/uploadStatusOverlay"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="#99000000"
+            android:visibility="gone"
+            android:clickable="true"
+            android:focusable="true"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:orientation="vertical"
+                android:gravity="center">
+
+                <ProgressBar
+                    android:id="@+id/uploadProgressBar"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:indeterminateTint="#FFFFFF"
+                    android:visibility="gone"/>
+
+                <TextView
+                    android:id="@+id/tvUploadStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Uploading..."
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="8dp"/>
+
+                <TextView
+                    android:id="@+id/btnRetry"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Tap to retry"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:layout_marginTop="4dp"
+                    android:padding="8dp"
+                    android:visibility="gone"/>
+
+            </LinearLayout>
+
+        </FrameLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

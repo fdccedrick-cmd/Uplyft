@@ -11,16 +11,16 @@ data class PostEntity(
     val username    : String = "",
     val userImageUrl: String = "",
     val imageUrl    : String,
-    val imageUrls  : String = "", // JSON string of all image URLs
+    val imageUrls  : String = "",
     val caption     : String,
     val commentsCount: Int     = 0,
     val likesCount  : Int     = 0,
     val isLiked     : Boolean = false,
     val createdAt   : Long    = System.currentTimeMillis(),
-    val isSynced    : Boolean = false
+    val isSynced    : Boolean = false,
+    val uploadStatus: String  = "synced" // "pending", "uploading", "failed", "synced"
 )
 
-// PostEntity → Post (every field maps 1:1 now)
 fun PostEntity.toDomain() = Post(
     postId       = postId,
     userId       = userId,
@@ -33,10 +33,12 @@ fun PostEntity.toDomain() = Post(
     commentsCount= commentsCount,
     likesCount   = likesCount,
     isLiked      = isLiked,
+    isSaved      = false,
+    uploadStatus = uploadStatus,
     createdAt    = createdAt
 )
 
-// Post → PostEntity
+
 fun Post.toEntity(isSynced: Boolean = true) = PostEntity(
     postId       = postId,
     userId       = userId,
@@ -49,5 +51,6 @@ fun Post.toEntity(isSynced: Boolean = true) = PostEntity(
     likesCount   = likesCount,
     isLiked      = isLiked,
     createdAt    = createdAt,
-    isSynced     = isSynced
+    isSynced     = isSynced,
+    uploadStatus = if (isSynced) "synced" else uploadStatus
 )

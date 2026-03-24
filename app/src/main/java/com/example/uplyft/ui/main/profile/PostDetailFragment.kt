@@ -67,6 +67,7 @@ class PostDetailFragment : Fragment() {
             },
             onShareClick   = { post -> sharePost(post) },
             onSaveClick    = { post -> postViewModel.toggleSavePost(post) },
+            onRetryClick   = { post -> postViewModel.retryUpload(post) },
             onProfileClick = { post ->
                 val currentUid = FirebaseAuth.getInstance().currentUser?.uid
                 if (post.userId == currentUid) {

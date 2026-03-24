@@ -23,8 +23,6 @@ import kotlinx.coroutines.launch
 class PostViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db             = AppDatabase.getInstance(application)
-    private val cloudinary = CloudinaryService(application.applicationContext)
-    private val firebaseSource = PostFirebaseSource()
     private val repository = PostRepository(
         context           = application.applicationContext,
         postDao           = AppDatabase.getInstance(application).postDao(),
@@ -49,10 +47,13 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     private val _feedState = MutableStateFlow<FeedState>(FeedState.Loading)
     val feedState: StateFlow<FeedState> = _feedState
 
+    private val _isLoadingMore = MutableStateFlow(false)
+    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore
+
     // Pagination
     private var lastDocument: DocumentSnapshot? = null
-    private val pageSize = 10
-    private var isLoadingMore = false
+    private val pageSize = 5
+    private var isLoadingMoreFlag = false
 
     init {
         viewModelScope.launch {
@@ -73,13 +74,15 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadMorePosts() {
-        if (isLoadingMore) return
+        if (isLoadingMoreFlag) return
         viewModelScope.launch {
-            isLoadingMore = true
+            isLoadingMoreFlag = true
+            _isLoadingMore.value = true
             try {
                 repository.loadMorePosts(limit = pageSize)
             } finally {
-                isLoadingMore = false
+                isLoadingMoreFlag = false
+                _isLoadingMore.value = false
             }
         }
     }
@@ -87,18 +90,6 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleLike(post: Post) {
         viewModelScope.launch {
             repository.toggleLike(post)
-        }
-    }
-
-    fun incrementCommentCount(postId: String) {
-        viewModelScope.launch {
-            repository.incrementCommentCount(postId)
-        }
-    }
-
-    fun decrementCommentCount(postId: String) {
-        viewModelScope.launch {
-            repository.decrementCommentCount(postId)
         }
     }
 
@@ -113,14 +104,23 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
     }
+
+    fun retryUpload(post: Post) {
+        android.util.Log.d("PostViewModel", "retryUpload called for postId=${post.postId}")
+        viewModelScope.launch {
+            repository.retryUpload(
+                post       = post,
+                onProgress = {
+                    android.util.Log.d("PostViewModel", "Upload progress: $it")
+                    _uploadState.value = it
+                }
+            )
+        }
+    }
+
     fun getUserPosts(userId: String): Flow<List<Post>> {
         return repository.observeUserPosts(userId)
     }
-
-    // ─────────────────────────────────────────────
-    // SAVE POST
-    // ─────────────────────────────────────────────
-
     fun toggleSavePost(post: Post) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         viewModelScope.launch {

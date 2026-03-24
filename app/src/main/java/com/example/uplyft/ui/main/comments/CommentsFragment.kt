@@ -94,6 +94,22 @@ class CommentsFragment : Fragment() {
 
         // Load comments for this post
         postId?.let {
+            // Check if comments are already loaded (navigation back scenario)
+            val currentComments = viewModel.comments.value
+            if (currentComments.isNotEmpty()) {
+                // Comments already loaded, hide shimmer immediately
+                hasLoadedOnce = true
+                shimmerLoadingContainer.visibility = View.GONE
+                stopShimmerAnimation()
+                emptyState.visibility = View.GONE
+                recyclerView.visibility = View.VISIBLE
+            } else {
+                // First time loading, show shimmer
+                shimmerLoadingContainer.visibility = View.VISIBLE
+                emptyState.visibility = View.GONE
+                recyclerView.visibility = View.GONE
+            }
+
             viewModel.loadComments(it)
             viewModel.syncPostCommentCountFromFirestore(it)
         }
@@ -238,7 +254,7 @@ class CommentsFragment : Fragment() {
 
                         adapter.submitFullList(list)
 
-                        // ✅ FIXED: Show empty state immediately if no comments, skip shimmer
+                        // ✅ FIXED: Only handle shimmer/empty state on first load
                         if (!hasLoadedOnce) {
                             // First load complete
                             hasLoadedOnce = true
@@ -262,7 +278,8 @@ class CommentsFragment : Fragment() {
                                 }
                             }
                         } else {
-                            // Subsequent updates (new comments added)
+                            // Subsequent updates (new comments added or navigation back)
+                            // Just update visibility, don't touch shimmer
                             if (list.isEmpty()) {
                                 emptyState.visibility = View.VISIBLE
                                 recyclerView.visibility = View.GONE
@@ -270,7 +287,7 @@ class CommentsFragment : Fragment() {
                                 emptyState.visibility = View.GONE
                                 recyclerView.visibility = View.VISIBLE
 
-                                // Auto-scroll to latest comment on new comment added
+                                // Auto-scroll to latest comment only if count increased
                                 if (currentCount > lastCommentCount) {
                                     recyclerView.post {
                                         if (adapter.itemCount > 0) {

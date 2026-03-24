@@ -7,7 +7,6 @@ import androidx.room.Query
 import com.example.uplyft.data.local.entity.PostEntity
 import kotlinx.coroutines.flow.Flow
 
-// data/local/dao/PostDao.kt
 @Dao
 interface PostDao {
 
@@ -16,6 +15,9 @@ interface PostDao {
 
     @Query("SELECT * FROM posts ORDER BY createdAt DESC")
     fun observeAllPosts(): Flow<List<PostEntity>>
+
+    @Query("SELECT * FROM posts ORDER BY createdAt DESC")
+    suspend fun getAllPostsSync(): List<PostEntity>
 
     @Query("SELECT * FROM posts WHERE userId = :userId ORDER BY createdAt DESC")
     fun observeUserPosts(userId: String): Flow<List<PostEntity>>
@@ -38,9 +40,21 @@ interface PostDao {
     @Query("UPDATE posts SET commentsCount = :count WHERE postId = :postId")
     suspend fun updateCommentCount(postId: String, count: Int)
 
+    @Query("UPDATE posts SET isSynced = :synced WHERE postId = :postId")
+    suspend fun markAsSynced(postId: String, synced: Boolean)
+
+    @Query("UPDATE posts SET uploadStatus = :status WHERE postId = :postId")
+    suspend fun updateUploadStatus(postId: String, status: String)
+
+    @Query("UPDATE posts SET imageUrl = :url, imageUrls = :urls, isSynced = :synced WHERE postId = :postId")
+    suspend fun updatePostUrlsAndSync(postId: String, url: String, urls: String, synced: Boolean)
+
     @Query("DELETE FROM posts WHERE postId = :postId")
     suspend fun deletePost(postId: String)
 
     @Query("SELECT * FROM posts WHERE isSynced = 0")
     suspend fun getUnsyncedPosts(): List<PostEntity>
+
+    @Query("SELECT * FROM posts WHERE isSynced = 0")
+    fun observeUnsyncedPosts(): Flow<List<PostEntity>>
 }

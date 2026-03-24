@@ -20,7 +20,7 @@ import com.example.uplyft.data.local.entity.SavedPostEntity
 
 @Database(
     entities = [PostEntity::class, UserEntity::class, FollowEntity::class, UserStatsEntity::class, SearchHistoryEntity::class, SavedPostEntity::class],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

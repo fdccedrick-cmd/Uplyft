@@ -15,6 +15,7 @@ import com.example.uplyft.domain.model.Post
 import com.example.uplyft.utils.Constants.USERS_COLLECTION
 import com.example.uplyft.utils.NotificationSender
 import com.example.uplyft.utils.PostUploadState
+import com.example.uplyft.utils.NetworkUtils
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -22,19 +23,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeout
 import java.util.UUID
-import kotlin.Exception
-import kotlin.collections.mutableSetOf
-import kotlin.collections.forEach
-import kotlin.collections.map
-import kotlin.collections.joinToString
 
-
-// data/repository/PostRepository.kt
 class PostRepository(
     private val context          : Context,
     private val postDao          : PostDao,
@@ -47,9 +41,6 @@ class PostRepository(
     private val pendingLikeUpdates = mutableSetOf<String>()
     private val pendingCommentUpdates = mutableSetOf<String>()
 
-    // ─────────────────────────────────────────────
-    // OBSERVE
-    // ─────────────────────────────────────────────
 
     fun observePosts(): Flow<List<Post>> {
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
@@ -77,28 +68,43 @@ class PostRepository(
         }
     }
 
-    // ─────────────────────────────────────────────
-    // FETCH
-    // ─────────────────────────────────────────────
-
-    suspend fun refreshPosts(limit: Int = 10) {
+    suspend fun refreshPosts(limit: Int = 5) {
         try {
             val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
-            val remotePosts   = firebaseSource.fetchPosts(
+
+            // Fetch new posts from Firestore
+            val remotePosts = firebaseSource.fetchPosts(
                 limit         = limit,
                 currentUserId = currentUserId
             )
-            remotePosts.forEach { post ->
-                // Skip if post has pending like or comment updates
-                if (!pendingLikeUpdates.contains(post.postId) &&
-                    !pendingCommentUpdates.contains(post.postId)) {
-                    postDao.insertPost(post.toEntity(isSynced = true))
+
+            // Only clear cache if we got new posts successfully
+            if (remotePosts.isNotEmpty()) {
+                // Keep unsynced posts (pending uploads)
+                val unsyncedPosts = postDao.getUnsyncedPosts()
+                val unsyncedPostIds = unsyncedPosts.map { it.postId }
+
+                // Clear all synced posts from Room
+                val allPosts = postDao.getAllPostsSync()
+                allPosts.forEach { post ->
+                    if (!unsyncedPostIds.contains(post.postId)) {
+                        postDao.deletePost(post.postId)
+                    }
+                }
+
+                // Insert new posts
+                remotePosts.forEach { post ->
+                    if (!pendingLikeUpdates.contains(post.postId) &&
+                        !pendingCommentUpdates.contains(post.postId)) {
+                        postDao.insertPost(post.toEntity(isSynced = true))
+                    }
                 }
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+        }
     }
 
-    suspend fun loadMorePosts(limit: Int = 10) {
+    suspend fun loadMorePosts(limit: Int = 5) {
         try {
             val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
             val remotePosts   = firebaseSource.fetchMorePosts(
@@ -115,9 +121,18 @@ class PostRepository(
         } catch (_: Exception) {}
     }
 
-    // ─────────────────────────────────────────────
-    // LIKE
-    // ─────────────────────────────────────────────
+    suspend fun refreshUserPosts(userId: String, currentUserId: String?) {
+        try {
+            val remotePosts = firebaseSource.fetchUserPosts(userId, currentUserId)
+
+            // Insert/update user's posts in Room (don't delete others)
+            remotePosts.forEach { post ->
+                postDao.insertPost(post.toEntity(isSynced = true))
+            }
+        } catch (_: Exception) {
+            // Keep existing cache on error
+        }
+    }
 
     suspend fun toggleLike(post: Post) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
@@ -174,66 +189,76 @@ class PostRepository(
         }
     }
 
-    // ─────────────────────────────────────────────
-    // COMMENTS
-    // ─────────────────────────────────────────────
-
-    suspend fun incrementCommentCount(postId: String) {
-        try {
-            val currentPost = postDao.getPostById(postId)
-            if (currentPost != null) {
-                postDao.updateCommentCount(postId, currentPost.commentsCount + 1)
-
-                // Protect from being overwritten during refresh
-                pendingCommentUpdates.add(postId)
-                CoroutineScope(Dispatchers.IO).launch {
-                    delay(3000) // 3 seconds protection window
-                    pendingCommentUpdates.remove(postId)
-                }
-            }
-        } catch (_: Exception) {}
-    }
-
-    suspend fun decrementCommentCount(postId: String) {
-        try {
-            val currentPost = postDao.getPostById(postId)
-            if (currentPost != null && currentPost.commentsCount > 0) {
-                postDao.updateCommentCount(postId, currentPost.commentsCount - 1)
-
-                // Protect from being overwritten during refresh
-                pendingCommentUpdates.add(postId)
-                CoroutineScope(Dispatchers.IO).launch {
-                    delay(3000) // 3 seconds protection window
-                    pendingCommentUpdates.remove(postId)
-                }
-            }
-        } catch (_: Exception) {}
-    }
-
-    // ─────────────────────────────────────────────
-    // CREATE POST — supports multiple images
-    // ─────────────────────────────────────────────
-
     suspend fun createPost(
-        imageUris : List<Uri>,   // ✅ List<Uri>
+        imageUris : List<Uri>,
         caption   : String,
         userId    : String,
         onProgress: (PostUploadState) -> Unit
     ) {
         val tempPostId = UUID.randomUUID().toString()
 
-        // fetch user info
-        val userDoc      = FirebaseFirestore.getInstance()
-            .collection(USERS_COLLECTION)
-            .document(userId)
-            .get().await()
+        // Check network first - if offline, save as failed immediately
+        if (!NetworkUtils.isNetworkAvailable(context)) {
+            // No network - get cached user info if available
+            val cachedUser = db.userDao().getUserById(userId)?.toDomain()
+
+            val username = cachedUser?.username ?: cachedUser?.fullName ?: "You"
+            val userImageUrl = cachedUser?.profileImageUrl ?: ""
+
+            val localPost = PostEntity(
+                postId       = tempPostId,
+                userId       = userId,
+                username     = username,
+                userImageUrl = userImageUrl,
+                imageUrl     = imageUris.first().toString(),
+                imageUrls    = imageUris.joinToString(",") { it.toString() },
+                caption      = caption,
+                isSynced     = false,
+                uploadStatus = "failed"
+            )
+            postDao.insertPost(localPost)
+            onProgress(PostUploadState.Error("No internet connection - Tap to retry"))
+            return
+        }
+
+        // fetch user info (only when online)
+        val userDoc = try {
+            withTimeout(10000) {
+                FirebaseFirestore.getInstance()
+                    .collection(USERS_COLLECTION)
+                    .document(userId)
+                    .get().await()
+            }
+        } catch (e: Exception) {
+            // Failed to fetch user info - use cached
+            val cachedUser = db.userDao().getUserById(userId)?.toDomain()
+
+            val username = cachedUser?.username ?: cachedUser?.fullName ?: "You"
+            val userImageUrl = cachedUser?.profileImageUrl ?: ""
+
+            val localPost = PostEntity(
+                postId       = tempPostId,
+                userId       = userId,
+                username     = username,
+                userImageUrl = userImageUrl,
+                imageUrl     = imageUris.first().toString(),
+                imageUrls    = imageUris.joinToString(",") { it.toString() },
+                caption      = caption,
+                isSynced     = false,
+                uploadStatus = "failed"
+            )
+            postDao.insertPost(localPost)
+            onProgress(PostUploadState.Error("Failed to fetch user info - Check connection"))
+            return
+        }
+
         val fullName     = userDoc.getString("fullName") ?: ""
         val username     = userDoc.getString("username").let {
             if (it.isNullOrEmpty()) fullName else it
         }
         val userImageUrl = userDoc.getString("profileImageUrl") ?: ""
 
-        // ✅ save locally with first URI as preview
+        //save locally with first URI as preview - status "pending"
         val localPost = PostEntity(
             postId       = tempPostId,
             userId       = userId,
@@ -242,17 +267,22 @@ class PostRepository(
             imageUrl     = imageUris.first().toString(),
             imageUrls    = imageUris.joinToString(",") { it.toString() },
             caption      = caption,
-            isSynced     = false
+            isSynced     = false,
+            uploadStatus = "pending"
         )
         postDao.insertPost(localPost)
         onProgress(PostUploadState.Saving)
 
         try {
+            // Update status to "uploading"
+            postDao.updateUploadStatus(tempPostId, "uploading")
             onProgress(PostUploadState.Uploading)
 
-            // ✅ upload ALL images to Cloudinary sequentially
-            val cloudinaryUrls = imageUris.map { uri ->
-                cloudinaryService.uploadImage(uri)
+            // upload ALL images to Cloudinary sequentially with timeout
+            val cloudinaryUrls = withTimeout(60000) {
+                imageUris.map { uri ->
+                    cloudinaryService.uploadImage(uri)
+                }
             }
 
             onProgress(PostUploadState.Syncing)
@@ -266,12 +296,91 @@ class PostRepository(
                 imageUrls    = cloudinaryUrls,
                 caption      = caption
             )
-            firebaseSource.savePost(post)
-            postDao.updatePostUrl(tempPostId, cloudinaryUrls.first())
+
+            withTimeout(10000) {
+                firebaseSource.savePost(post)
+            }
+
+            //Update Room with cloud URLs and mark as synced
+            postDao.updatePostUrlsAndSync(
+                tempPostId,
+                cloudinaryUrls.first(),
+                cloudinaryUrls.joinToString(","),
+                true
+            )
+            postDao.updateUploadStatus(tempPostId, "synced")
             onProgress(PostUploadState.Done)
 
         } catch (e: Exception) {
-            onProgress(PostUploadState.Error(e.message ?: "Upload failed"))
+            // Mark as failed, keep in Room for retry
+            postDao.updateUploadStatus(tempPostId, "failed")
+            val errorMsg = when {
+                e.message?.contains("timeout", ignoreCase = true) == true -> "Upload timeout - Check your connection"
+                e.message?.contains("network", ignoreCase = true) == true -> "Network error"
+                else -> e.message ?: "Upload failed"
+            }
+            onProgress(PostUploadState.Error(errorMsg))
+        }
+    }
+
+    suspend fun retryUpload(post: Post, onProgress: (PostUploadState) -> Unit) {
+        // Check network first
+        if (!NetworkUtils.isNetworkAvailable(context)) {
+            postDao.updateUploadStatus(post.postId, "failed")
+            onProgress(PostUploadState.Error("No internet connection"))
+            return
+        }
+
+        Log.d("PostRepository", "retryUpload: Network available, starting upload")
+
+        try {
+            // Update status to "uploading"
+            postDao.updateUploadStatus(post.postId, "uploading")
+            onProgress(PostUploadState.Uploading)
+
+            // Parse local URIs from post.imageUrls
+            val localUris = post.imageUrls.map { Uri.parse(it) }
+
+            // Upload to Cloudinary with timeout
+            val cloudinaryUrls = withTimeout(60000) {
+                localUris.map { uri ->
+                    cloudinaryService.uploadImage(uri)
+                }
+            }
+
+            onProgress(PostUploadState.Syncing)
+
+            // Save to Firestore with timeout
+            Log.d("PostRepository", "retryUpload: Starting Firestore sync")
+            val updatedPost = post.copy(
+                imageUrl  = cloudinaryUrls.first(),
+                imageUrls = cloudinaryUrls
+            )
+            withTimeout(10000) {
+                firebaseSource.savePost(updatedPost)
+            }
+            Log.d("PostRepository", "retryUpload: Firestore sync complete")
+
+            // Update Room with cloud URLs
+            postDao.updatePostUrlsAndSync(
+                post.postId,
+                cloudinaryUrls.first(),
+                cloudinaryUrls.joinToString(","),
+                true
+            )
+            postDao.updateUploadStatus(post.postId, "synced")
+            Log.d("PostRepository", "retryUpload: Upload SUCCESS, status set to synced")
+            onProgress(PostUploadState.Done)
+
+        } catch (e: Exception) {
+            Log.e("PostRepository", "retryUpload: Upload FAILED - ${e.message}", e)
+            postDao.updateUploadStatus(post.postId, "failed")
+            val errorMsg = when {
+                e.message?.contains("timeout", ignoreCase = true) == true -> "Upload timeout - Check your connection"
+                e.message?.contains("network", ignoreCase = true) == true -> "Network error"
+                else -> e.message ?: "Upload failed"
+            }
+            onProgress(PostUploadState.Error(errorMsg))
         }
     }
 }
